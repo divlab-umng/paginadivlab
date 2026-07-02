@@ -1,13 +1,7 @@
 // lib/supabase/middleware.ts — refresca la sesión y aplica RBAC por ruta
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-// Home de cada rol tras iniciar sesión
-const ROLE_HOME: Record<string, string> = {
-  estudiante: "/laboratorios",
-  laboratorista: "/panel",
-  jefe: "/dashboard",
-};
+import { ROLE_HOME, getUserRole } from "@/lib/supabase/roles";
 
 // Prefijo de ruta → rol mínimo requerido (el Jefe puede entrar a todo)
 const ROUTE_GUARDS: [string, string][] = [
@@ -46,6 +40,7 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPublic =
+    path === "/" ||
     path.startsWith("/login") ||
     path.startsWith("/registro") ||
     path.startsWith("/auth");
@@ -58,15 +53,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profileError) {
-      console.error("[proxy] error al leer profiles.role:", profileError.message);
-    }
-    const role = profile?.role ?? "estudiante";
+    const role = await getUserRole(supabase, user.id);
 
     // Bloquea áreas que no correspondan al rol (el Jefe pasa siempre)
     for (const [prefix, needed] of ROUTE_GUARDS) {

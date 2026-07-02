@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ROLE_HOME, getUserRole } from "@/lib/supabase/roles";
 
 const INSTITUTIONAL_DOMAIN = "@unimilitar.edu.co";
 
@@ -47,12 +48,13 @@ export async function signIn(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) return { error: "Credenciales inválidas" };
 
   revalidatePath("/", "layout");
-  redirect("/"); // el middleware redirige al home según el rol
+  const role = await getUserRole(supabase, data.user.id);
+  redirect(ROLE_HOME[role] ?? "/laboratorios");
 }
 
 export async function signOut() {
