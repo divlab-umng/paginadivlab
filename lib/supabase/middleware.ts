@@ -58,11 +58,14 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
+    if (profileError) {
+      console.error("[proxy] error al leer profiles.role:", profileError.message);
+    }
     const role = profile?.role ?? "estudiante";
 
     // Bloquea áreas que no correspondan al rol (el Jefe pasa siempre)
