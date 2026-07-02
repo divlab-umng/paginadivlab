@@ -141,14 +141,32 @@ de la primera línea):
   en `app/layout.tsx`, expuestas como `--font-display`, `--font-sans`, `--font-mono`.
 - Login funcional: `app/(auth)/login/page.tsx` importa `LoginForm` desde
   `components/auth/login-form.tsx` (HTTP 200 verificado).
+- Registro funcional en `/registro` (`app/(auth)/registro/page.tsx` +
+  `components/auth/register-form.tsx`), con validación del dominio
+  `@unimilitar.edu.co` en tres capas: cliente (pattern del input), server action
+  (`signUp` en `app/(auth)/actions.ts`) y trigger `handle_new_user` en la DB.
+- Shells mínimos por rol: `/laboratorios` (estudiante), `/panel` (laboratorista),
+  `/dashboard` (jefe) — cada uno muestra "Panel de [rol]" y el correo autenticado.
+- `middleware.ts` renombrado a `proxy.ts` (convención Next.js 16); la función
+  exportada pasó de `middleware` a `proxy`.
+- Migración `supabase/migrations/0002_grants.sql`: corrige el bug de RBAC donde
+  el proxy leía `profiles.role` pero la consulta fallaba con "permission denied"
+  (42501) por falta de `GRANT` de tabla a `authenticated` — RLS ya filtraba
+  correctamente, pero faltaban los privilegios base. Con el GRANT aplicado, el
+  fallback silencioso a `"estudiante"` dejó de esconder el error.
+- RBAC verificado de punta a punta para los tres roles (estudiante, laboratorista,
+  jefe): acceso permitido a su home y bloqueo cruzado confirmado hacia las áreas
+  de los otros roles.
 
 **Pendiente:**
-- Página de registro (`app/(auth)/registro/page.tsx`).
-- Vista de laboratorios del estudiante (`(estudiante)/laboratorios/`).
-- Panel del laboratorista (`(laboratorista)/panel/`).
-- Dashboard del jefe (`(jefe)/dashboard/`).
-- Renombrar `middleware.ts` a `proxy.ts` (Next.js 16 marcó `middleware.ts` como
-  convención obsoleta a favor de `proxy.ts`).
+- Redirección post-login por rol: `signIn` hoy redirige a `/` y ese comentario
+  asume que "el middleware redirige al home según el rol", pero el proxy solo
+  aplica esa redirección cuando la ruta es `/login` o `/registro`; en `/` deja
+  pasar la petición sin redirigir. Falta cerrar ese salto.
+- Reemplazar la página raíz (`app/page.tsx` sigue siendo la plantilla por defecto
+  de Next.js).
+- Construir la vista de laboratorios del estudiante (`(estudiante)/laboratorios/`
+  hoy es solo el shell mínimo, falta listar labs/bloques/aforo real).
 
 ## Próximo paso sugerido
 
