@@ -1,0 +1,119 @@
+/* ==========================================================================
+   UMNG · Reserva de Laboratorios — estilos globales
+   Paleta del escudo: blanco + azul marino + rojo carmesí + dorado/mostaza.
+   Tailwind v4 (CSS-first). Las variables --umng-* funcionan también sin Tailwind.
+   ========================================================================== */
+
+@import "tailwindcss";
+
+:root {
+  /* Marca (colores del escudo) */
+  --umng-navy:        #0B254E; /* azul marino profundo — headers, menús */
+  --umng-navy-700:    #081C3C; /* navy más oscuro — hover/estados */
+  --umng-crimson:     #C41E3A; /* rojo carmesí — acciones importantes, alertas */
+  --umng-crimson-700: #9E1830;
+  --umng-gold:        #FDB913; /* dorado/mostaza — "Pendiente", detalles */
+  --umng-green:       #2E7D32; /* aprobado / éxito */
+
+  /* Superficies y texto */
+  --umng-bg:      #FFFFFF; /* fondo limpio */
+  --umng-surface: #F7F8FA; /* tarjetas / secciones suaves */
+  --umng-border:  #E3E6EC;
+  --umng-ink:     #0F1B2D; /* tinta principal (casi navy) */
+  --umng-muted:   #5B6472; /* texto secundario */
+
+  /* Semántica de estados de reserva */
+  --status-pendiente: var(--umng-gold);
+  --status-aprobada:  var(--umng-green);
+  --status-rechazada: var(--umng-crimson);
+  --status-cancelada: var(--umng-muted);
+}
+
+/* --- Mapeo a Tailwind v4 (habilita bg-navy, text-crimson, font-display…) - */
+@theme {
+  --color-navy:        var(--umng-navy);
+  --color-navy-700:    var(--umng-navy-700);
+  --color-crimson:     var(--umng-crimson);
+  --color-crimson-700: var(--umng-crimson-700);
+  --color-gold:        var(--umng-gold);
+  --color-green-umng:  var(--umng-green);
+
+  --color-surface: var(--umng-surface);
+  --color-ink:     var(--umng-ink);
+  --color-muted:   var(--umng-muted);
+
+  --font-display: "Libre Franklin", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius: 0.625rem; /* 10px */
+}
+
+/* --- Base --------------------------------------------------------------- */
+* { border-color: var(--umng-border); }
+
+body {
+  background: var(--umng-bg);
+  color: var(--umng-ink);
+  font-family: var(--font-sans, "Inter", system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display, "Libre Franklin", system-ui, sans-serif);
+  color: var(--umng-navy);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Datos técnicos: códigos de lab, horas, aforos */
+.font-data { font-family: var(--font-mono, "IBM Plex Mono", monospace); }
+
+/* Foco accesible visible en toda la app */
+:focus-visible {
+  outline: 2px solid var(--umng-navy);
+  outline-offset: 2px;
+}
+
+/* --- Piezas reutilizables del sistema de diseño ------------------------- */
+
+/* Barra superior institucional */
+.umng-header {
+  background: var(--umng-navy);
+  color: #fff;
+}
+
+/* Botón de acción principal (rojo carmesí) */
+.btn-primary {
+  background: var(--umng-crimson);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 0.625rem 1rem;
+  font-weight: 600;
+  transition: filter 0.15s ease;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Botón secundario (contorno navy) */
+.btn-secondary {
+  background: #fff;
+  color: var(--umng-navy);
+  border: 1px solid var(--umng-navy);
+  border-radius: var(--radius);
+  padding: 0.625rem 1rem;
+  font-weight: 600;
+}
+
+/* Insignias de estado — el dorado marca "Pendiente" */
+.badge { border-radius: 999px; padding: 0.125rem 0.625rem; font-size: 0.75rem; font-weight: 600; }
+.badge-pendiente { background: color-mix(in srgb, var(--umng-gold) 18%, #fff);     color: #7a5600; }
+.badge-aprobada  { background: color-mix(in srgb, var(--umng-green) 15%, #fff);    color: #1b5e20; }
+.badge-rechazada { background: color-mix(in srgb, var(--umng-crimson) 12%, #fff);  color: var(--umng-crimson-700); }
+.badge-cancelada { background: var(--umng-surface);                                color: var(--umng-muted); }
+
+/* Respeta reduce-motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
