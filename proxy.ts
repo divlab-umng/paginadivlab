@@ -1,8 +1,8 @@
-// middleware.ts — en la RAÍZ del proyecto (junto a package.json)
+// proxy.ts — en la RAÍZ del proyecto (junto a package.json)
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
 
