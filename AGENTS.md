@@ -157,16 +157,22 @@ de la primera línea):
 - RBAC verificado de punta a punta para los tres roles (estudiante, laboratorista,
   jefe): acceso permitido a su home y bloqueo cruzado confirmado hacia las áreas
   de los otros roles.
+- Helper compartido `lib/supabase/roles.ts` (`ROLE_HOME` + `getUserRole`): unifica
+  el criterio de rol → home entre el proxy, `signIn` y la página raíz, en vez de
+  duplicar la consulta a `profiles` en cada lugar.
+- Redirección post-login por rol: `signIn` (en `app/(auth)/actions.ts`) ahora lee
+  el rol con `getUserRole` justo tras autenticar y redirige directo a
+  `ROLE_HOME[role]`, sin rebotar por `/`.
+- Landing institucional UMNG en la raíz (`app/page.tsx`): visitantes sin sesión
+  ven la landing (título, línea institucional, botones "Ingresar"/"Registrarse");
+  con sesión activa, redirige al panel del rol vía `ROLE_HOME`/`getUserRole`.
+  Para que la landing sea alcanzable, se agregó `path === "/"` (match exacto, no
+  por prefijo) a las rutas públicas del proxy en `lib/supabase/middleware.ts`.
 
 **Pendiente:**
-- Redirección post-login por rol: `signIn` hoy redirige a `/` y ese comentario
-  asume que "el middleware redirige al home según el rol", pero el proxy solo
-  aplica esa redirección cuando la ruta es `/login` o `/registro`; en `/` deja
-  pasar la petición sin redirigir. Falta cerrar ese salto.
-- Reemplazar la página raíz (`app/page.tsx` sigue siendo la plantilla por defecto
-  de Next.js).
 - Construir la vista de laboratorios del estudiante (`(estudiante)/laboratorios/`
-  hoy es solo el shell mínimo, falta listar labs/bloques/aforo real).
+  hoy es solo el shell mínimo): listar los 57 labs, ver bloques con aforo,
+  solicitar reserva.
 
 ## Próximo paso sugerido
 
