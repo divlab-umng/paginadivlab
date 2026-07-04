@@ -168,14 +168,36 @@ de la primera línea):
   con sesión activa, redirige al panel del rol vía `ROLE_HOME`/`getUserRole`.
   Para que la landing sea alcanzable, se agregó `path === "/"` (match exacto, no
   por prefijo) a las rutas públicas del proxy en `lib/supabase/middleware.ts`.
+- Vista de laboratorios del estudiante construida y verificada en el navegador.
+  Datos: la tabla `laboratories` está cargada con ~50 laboratorios (dinámico: la
+  cantidad se lee de la tabla `laboratories`, no está hardcodeada); hay bloques
+  horarios de prueba en 3 labs (`METALES`, `ROBOTICA`, `AUTOMATIZACION_CONTROL`)
+  con sesiones materializadas vía `ensure_sessions`. Estos seeds no están
+  versionados: no existen `supabase/migrations/0003_seed_labs.sql` ni
+  `0004_seed_blocks.sql` en el repo, se cargaron directo por SQL (Studio/SQL
+  Editor).
+- Convención de `code`: slug en MAYÚSCULAS sin tildes, sin prefijo "LABORATORIO"
+  (p.ej. `METALES`, `AUTOMATIZACION_CONTROL`). Las rutas del estudiante usan
+  `code`, no UUID.
+- Pieza 1 — Lista `/laboratorios` (`app/(estudiante)/laboratorios/page.tsx` +
+  `components/labs/lab-card.tsx`): grid con badge de disponibilidad real leída de
+  `block_sessions` (ventana de 7 días). Verificada.
+- Pieza 2 — Detalle `/laboratorios/[code]` (`[code]/page.tsx` +
+  `session-list.tsx` + `request-button.tsx` + `actions.ts`): sesiones agrupadas
+  por día con "X de Y cupos"; botón "Solicitar" → Server Action → RPC
+  `request_reservation` (atómico) + `revalidatePath`; auto-`ensure_sessions` al
+  abrir el detalle. Verificado end-to-end (reserva creada, cupo 20→19, badge
+  "Solicitada", candado anti-doble-reserva). Solo funciona con rol estudiante.
+- Decisión: la creación de `schedule_blocks` desde el panel del laboratorista
+  queda como feature futura; por ahora los bloques se siembran vía SQL.
 
 **Pendiente:**
-- Construir la vista de laboratorios del estudiante (`(estudiante)/laboratorios/`
-  hoy es solo el shell mínimo): listar los 57 labs, ver bloques con aforo,
-  solicitar reserva.
+- Sin pendientes inmediatos en esta pieza — ver "Próximo paso sugerido" abajo.
 
 ## Próximo paso sugerido
 
-Construir la página de disponibilidad del estudiante
-(`(estudiante)/laboratorios/[code]/page.tsx`) que llama a `ensure_sessions` y muestra
-bloques con cupos, con botón de reserva vía `request_reservation`.
+Pieza 3 — vista "Mis reservas" del estudiante: listar las reservas propias y
+permitir cancelarlas vía RPC `cancel_reservation`.
+
+Como siguientes: el panel del laboratorista (aprobar/rechazar solicitudes con
+`decide_reservation`) y la creación de `schedule_blocks` desde ese panel.
