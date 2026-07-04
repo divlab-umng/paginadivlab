@@ -172,10 +172,9 @@ de la primera línea):
   Datos: la tabla `laboratories` está cargada con ~50 laboratorios (dinámico: la
   cantidad se lee de la tabla `laboratories`, no está hardcodeada); hay bloques
   horarios de prueba en 3 labs (`METALES`, `ROBOTICA`, `AUTOMATIZACION_CONTROL`)
-  con sesiones materializadas vía `ensure_sessions`. Estos seeds no están
-  versionados: no existen `supabase/migrations/0003_seed_labs.sql` ni
-  `0004_seed_blocks.sql` en el repo, se cargaron directo por SQL (Studio/SQL
-  Editor).
+  con sesiones materializadas vía `ensure_sessions`. Estos seeds ya están
+  versionados en `supabase/migrations/0003_seed_labs.sql` (labs) y
+  `0004_seed_blocks.sql` (bloques de prueba).
 - Convención de `code`: slug en MAYÚSCULAS sin tildes, sin prefijo "LABORATORIO"
   (p.ej. `METALES`, `AUTOMATIZACION_CONTROL`). Las rutas del estudiante usan
   `code`, no UUID.
@@ -190,14 +189,20 @@ de la primera línea):
   "Solicitada", candado anti-doble-reserva). Solo funciona con rol estudiante.
 - Decisión: la creación de `schedule_blocks` desde el panel del laboratorista
   queda como feature futura; por ahora los bloques se siembran vía SQL.
+- Pieza 3 — "Mis reservas" (`app/(estudiante)/mis-reservas/page.tsx` +
+  `actions.ts` + `components/reservas/reservation-list.tsx` +
+  `cancel-button.tsx`): lista las reservas del estudiante agrupadas en
+  Próximas/Pasadas con badges de estado; cancelar vía Server Action → RPC
+  `cancel_reservation` + `revalidatePath`, con confirmación en dos pasos.
+  Enlace "Mis reservas" en el header de `/laboratorios`. Verificado
+  end-to-end (cancelación libera cupo). Fix de zona horaria en el cálculo de
+  "hoy" (local, no UTC).
 
 **Pendiente:**
 - Sin pendientes inmediatos en esta pieza — ver "Próximo paso sugerido" abajo.
 
 ## Próximo paso sugerido
 
-Pieza 3 — vista "Mis reservas" del estudiante: listar las reservas propias y
-permitir cancelarlas vía RPC `cancel_reservation`.
+Panel del laboratorista: aprobar/rechazar solicitudes con `decide_reservation`.
 
-Como siguientes: el panel del laboratorista (aprobar/rechazar solicitudes con
-`decide_reservation`) y la creación de `schedule_blocks` desde ese panel.
+Como siguiente: la creación de `schedule_blocks` desde ese mismo panel.

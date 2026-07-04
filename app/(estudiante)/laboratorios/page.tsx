@@ -1,4 +1,5 @@
 // app/(estudiante)/laboratorios/page.tsx — Lista de laboratorios (vista del estudiante)
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { LabCard } from "@/components/labs/lab-card";
 
@@ -44,11 +45,16 @@ export default async function LaboratoriosPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="umng-header">
-        <div className="mx-auto max-w-6xl px-6 py-5">
-          <p className="font-data text-xs uppercase tracking-widest text-white/70">
-            UMNG · Reserva de Laboratorios
-          </p>
-          <h1 className="mt-1 text-2xl text-white">Laboratorios</h1>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+          <div>
+            <p className="font-data text-xs uppercase tracking-widest text-white/70">
+              UMNG · Reserva de Laboratorios
+            </p>
+            <h1 className="mt-1 text-2xl text-white">Laboratorios</h1>
+          </div>
+          <Link href="/mis-reservas" className="font-data text-xs uppercase tracking-widest text-white/70 hover:text-white">
+            Mis reservas →
+          </Link>
         </div>
       </header>
 
