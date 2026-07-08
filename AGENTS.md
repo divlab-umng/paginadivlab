@@ -197,12 +197,25 @@ de la primera línea):
   Enlace "Mis reservas" en el header de `/laboratorios`. Verificado
   end-to-end (cancelación libera cupo). Fix de zona horaria en el cálculo de
   "hoy" (local, no UTC).
+- Panel del laboratorista (`app/(laboratorista)/panel/page.tsx` + `actions.ts` +
+  `components/panel/request-inbox.tsx` + `decision-buttons.tsx`): bandeja de
+  solicitudes pendientes de los labs asignados (RLS filtra por
+  `is_lab_admin`); aprobar (un clic) o rechazar (con motivo opcional) vía
+  Server Action → RPC `decide_reservation` + `revalidatePath`. Verificado
+  end-to-end: aprobar y rechazar con motivo, ambos persistidos (`status`,
+  `decision_reason`, `decided_by`, `decided_at`). La asignación
+  laboratorista↔lab se hace en `lab_admins` (por ahora vía SQL directo).
+- Migración `supabase/migrations/0005_fix_decide_reservation.sql`: corrige el
+  RPC `decide_reservation`, que fallaba con "column status is of type
+  reservation_status but expression is of type text" — el `CASE` devolvía
+  `text` y faltaba el cast explícito `::public.reservation_status` en el
+  `UPDATE`.
 
 **Pendiente:**
 - Sin pendientes inmediatos en esta pieza — ver "Próximo paso sugerido" abajo.
 
 ## Próximo paso sugerido
 
-Panel del laboratorista: aprobar/rechazar solicitudes con `decide_reservation`.
+La creación de `schedule_blocks` desde el panel del laboratorista.
 
-Como siguiente: la creación de `schedule_blocks` desde ese mismo panel.
+Como siguiente: el dashboard del jefe con métricas.
