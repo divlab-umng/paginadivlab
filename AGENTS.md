@@ -87,13 +87,15 @@ app/
   globals.css
 components/ui/           (botones, badges, cards)
 components/auth/login-form.tsx
+components/labs/
 components/reservas/
+components/panel/
 components/dashboard/
-lib/supabase/{client,server,middleware}.ts
+lib/supabase/{client,server,middleware}.ts   (el proxy raíz es proxy.ts; este middleware de supabase conserva su nombre)
 lib/email/               (Resend + plantillas)
 lib/types/database.types.ts   (generar con: supabase gen types typescript)
 emails/                  (plantillas con logo UMNG)
-middleware.ts            (raíz)
+proxy.ts                (raíz, era middleware.ts — convención Next 16)
 ```
 
 ## Variables de entorno (`.env.local`)
@@ -105,11 +107,11 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 RESEND_API_KEY=
 ```
 
-## Colocación de los archivos ya generados
+## Colocación de los archivos base (histórico — ya aplicado)
 
-Hay 9 archivos base descargados (probablemente en la carpeta Descargas del usuario).
-Muévelos a estas rutas exactas (cada archivo lleva su ruta destino en el comentario
-de la primera línea):
+Registro histórico del bootstrap inicial: estos 9 archivos base ya fueron
+colocados en sus rutas. No es una tarea pendiente; se conserva como referencia
+de dónde vive cada pieza fundacional.
 
 | Archivo descargado       | Ruta destino en el proyecto        |
 |--------------------------|------------------------------------|
@@ -211,8 +213,10 @@ de la primera línea):
   `text` y faltaba el cast explícito `::public.reservation_status` en el
   `UPDATE`.
 
-**Pendiente:**
-- Sin pendientes inmediatos en esta pieza — ver "Próximo paso sugerido" abajo.
+**Deuda técnica conocida (no urgente):**
+- La asignación laboratorista↔lab (`lab_admins`) se hace por SQL directo; falta UI para que el jefe la gestione.
+- Los `schedule_blocks` se siembran por SQL; falta que el laboratorista los cree desde su panel (es el próximo paso).
+- Faltan generar los tipos de la BD (`lib/types/database.types.ts` con `supabase gen types typescript`); hoy se tipan las consultas a mano con casts.
 
 ## Próximo paso sugerido
 
