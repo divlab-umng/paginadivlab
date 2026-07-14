@@ -224,18 +224,31 @@ de dónde vive cada pieza fundacional.
   `active`) y `weekday` usa convención ISO (1=Lunes … 7=Domingo, `isodow`).
   Verificado end-to-end: crear bloque → sesión materializada en el día y aforo
   correctos → listado del panel poblado. Ya no se siembran por SQL.
+- Dashboard del jefe v1 (`app/(jefe)/dashboard/page.tsx` +
+  `components/dashboard/lab-usage-table.tsx` + `top-franjas.tsx`): vista global
+  con validación de rol `jefe`. Consume las vistas `v_lab_usage` y
+  `v_demanda_horaria` (Server Component, `security_invoker` respeta RLS). Tres
+  capas: tarjetas resumen (aprobadas, pendientes, total labs, total reservas),
+  tabla de uso por lab (filtrada a labs con actividad para evitar ruido de ~50
+  filas en cero), y ranking de franjas más demandadas (mapea `lab_id`→nombre
+  porque la vista solo trae el UUID; día en ISO). Manejo de error visible en
+  pantalla, no silencioso. Verificado e2e con datos reales de prueba. La tarjeta
+  de asistencia se omitió a propósito: `attended` aún no se registra en la
+  práctica.
 
 **Deuda técnica conocida (no urgente):**
 - La asignación laboratorista↔lab (`lab_admins`) se hace por SQL directo; falta UI para que el jefe la gestione.
 - Al desactivar un bloque (`deactivate_schedule_block`) solo se marca `is_active = false`; las sesiones futuras ya materializadas en `block_sessions` no se limpian (podrían tener reservas). Falta decidir la política de limpieza al revisar el esquema de `block_sessions`.
+- El dashboard no muestra asistencia (tarjeta ni columnas) porque `attended` aún no se registra; `v_lab_usage` ya expone `asistencias`/`inasistencias` para cuando exista el flujo de registro.
 - Faltan generar los tipos de la BD (`lib/types/database.types.ts` con `supabase gen types typescript`); hoy se tipan las consultas a mano con casts.
 
 ## Próximo paso sugerido
 
-El dashboard del jefe con métricas (uso de labs, volumen de prácticas, franjas
-de mayor demanda, asistencia), usando las vistas `v_lab_usage`,
-`v_demanda_horaria`, `v_ocupacion_sesion`.
+Iterar el dashboard: añadir gráficos donde aporten (p.ej. demanda por franja en
+barras), incorporar `v_ocupacion_sesion` (ocupación por sesión), y filtros por
+rango de fechas o por lab.
 
 Otros pendientes en cola: UI para asignar `lab_admins` (hoy por SQL), generar
-`lib/types/database.types.ts`, y la limpieza de `block_sessions` al desactivar
-un bloque.
+`lib/types/database.types.ts`, la limpieza de `block_sessions` al desactivar un
+bloque, y el registro de asistencia (`attended`) que habilitaría las métricas de
+asistencia del dashboard.
