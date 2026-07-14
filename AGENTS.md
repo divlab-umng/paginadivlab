@@ -212,14 +212,30 @@ de dónde vive cada pieza fundacional.
   reservation_status but expression is of type text" — el `CASE` devolvía
   `text` y faltaba el cast explícito `::public.reservation_status` en el
   `UPDATE`.
+- Gestión de `schedule_blocks` desde el panel del laboratorista
+  (`app/(laboratorista)/panel/horarios/`: `page.tsx` + `actions.ts` +
+  `components/panel/block-form.tsx` + `block-list.tsx`): el laboratorista crea
+  bloques (día ISO, hora inicio/fin, aforo) y los desactiva con confirmación en
+  dos pasos, todo vía RPCs `SECURITY DEFINER` (`create_schedule_block`,
+  `deactivate_schedule_block`, `my_admin_labs`) + `revalidatePath`. Al crear un
+  bloque se materializan 8 semanas de sesiones vía `ensure_sessions`. Migración
+  `0006_schedule_blocks_mgmt.sql` (RPCs + RLS de lectura + helper), corregida por
+  `0007_fix_schedule_block_active.sql`: la columna real es `is_active` (no
+  `active`) y `weekday` usa convención ISO (1=Lunes … 7=Domingo, `isodow`).
+  Verificado end-to-end: crear bloque → sesión materializada en el día y aforo
+  correctos → listado del panel poblado. Ya no se siembran por SQL.
 
 **Deuda técnica conocida (no urgente):**
 - La asignación laboratorista↔lab (`lab_admins`) se hace por SQL directo; falta UI para que el jefe la gestione.
-- Los `schedule_blocks` se siembran por SQL; falta que el laboratorista los cree desde su panel (es el próximo paso).
+- Al desactivar un bloque (`deactivate_schedule_block`) solo se marca `is_active = false`; las sesiones futuras ya materializadas en `block_sessions` no se limpian (podrían tener reservas). Falta decidir la política de limpieza al revisar el esquema de `block_sessions`.
 - Faltan generar los tipos de la BD (`lib/types/database.types.ts` con `supabase gen types typescript`); hoy se tipan las consultas a mano con casts.
 
 ## Próximo paso sugerido
 
-La creación de `schedule_blocks` desde el panel del laboratorista.
+El dashboard del jefe con métricas (uso de labs, volumen de prácticas, franjas
+de mayor demanda, asistencia), usando las vistas `v_lab_usage`,
+`v_demanda_horaria`, `v_ocupacion_sesion`.
 
-Como siguiente: el dashboard del jefe con métricas.
+Otros pendientes en cola: UI para asignar `lab_admins` (hoy por SQL), generar
+`lib/types/database.types.ts`, y la limpieza de `block_sessions` al desactivar
+un bloque.
