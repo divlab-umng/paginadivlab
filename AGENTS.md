@@ -17,6 +17,24 @@ materiales está **fuera de alcance**: no crear lógica de inventario.
 - **Despliegue objetivo**: Vercel.
 - Import alias: `@/*` apunta a la raíz del proyecto.
 
+## Infraestructura y titularidad de cuentas
+
+Estado: **julio 2026** — migrado de cuentas personales a identidad institucional (`juans.vargas@unimilitar.edu.co`) como paso previo a la adopción formal por la UMNG.
+
+- **Repositorio**: `github.com/divlab-umng/paginadivlab` (privado). Vive bajo la organización de GitHub `divlab-umng`, propiedad (por ahora) de la cuenta `VARGASBORDA-JS` con el correo institucional verificado y **2FA activo**. Antes estaba en `github.com/VARGASBORDA-JS/paginadivlab` (GitHub deja redirección automática desde la URL vieja).
+- **Supabase**: proyecto `reservas-labs-umng` (ref `fabvriqzqnhzxpxrunil`, región `us-east-1`) bajo la organización `divlab-umng` (tipo Educational, plan Free). La transferencia entre organizaciones **conservó URL y API keys**: `.env.local` no cambió. Antes estaba en `VARGASBORDA-JS's Org`.
+- **Vercel**: aún **sin desplegar**. El montaje se hará cuando el despliegue esté aprobado por la institución (subdominio `unimilitar.edu.co`, dominio verificado de Resend, revisión de la OFITIC). No es "migración" sino montaje limpio.
+
+**Nota operativa (plan Free de Supabase):** los proyectos se pausan tras 7 días de inactividad de la base de datos. La pausa **no borra datos**; se reanuda desde el dashboard ("Resume project"). Pendiente: keep-alive (GitHub Action) o subir a Pro en producción.
+
+**Modelo de gobernanza (propuesto, a confirmar con jefatura/coordinación):**
+- Dueño funcional del proceso: **División de Laboratorios**.
+- Dueño técnico / custodio: **Oficina Asesora de TIC (OFITIC)** — infraestructura, seguridad (MSPI, Resolución 4352 de 2016), gestor de identidad institucional.
+- Desarrollador/mantenedor: Juan Sebastian Vargas (rol asignado, no dueño de cuentas).
+- Meta: que estas organizaciones pasen a ser de la OFITIC con el mantenedor como administrador (segunda migración, mismo patrón de 5 pasos: preparar destino → verificar roles → transferir → actualizar referencias → verificar).
+
+**Cumplimiento pendiente para "go-live" (entidad pública, Ley 1581 de 2012):** política de tratamiento de datos + autorización (habeas data) en el registro, inscripción en el RNBD (SIC), contrato de transmisión internacional (Supabase en EE.UU., país con nivel adecuado según la SIC), y revisión de seguridad de la OFITIC (MSPI). La validación actual del correo por *patrón* `@unimilitar.edu.co` debería migrar a integración con el **gestor de identidad institucional** (SSO), que además resuelve la verificación real de estudiante.
+
 ## Roles (RBAC)
 
 - **estudiante**: ve laboratorios, descarga PDF de requisitos, solicita reservas en
@@ -106,6 +124,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 RESEND_API_KEY=
 ```
+
+En producción, `NEXT_PUBLIC_SITE_URL` debe ser la URL pública real (dominio de Vercel o subdominio institucional), **no** `localhost`. La URL y las keys de Supabase **no cambiaron** con la migración de organización.
 
 ## Colocación de los archivos base (histórico — ya aplicado)
 
@@ -235,20 +255,22 @@ de dónde vive cada pieza fundacional.
   pantalla, no silencioso. Verificado e2e con datos reales de prueba. La tarjeta
   de asistencia se omitió a propósito: `attended` aún no se registra en la
   práctica.
+- **Migración de infraestructura a identidad institucional (julio 2026):** repo transferido a la organización de GitHub `divlab-umng` (2FA activo, correo institucional verificado; remoto local reapuntado y `git push` verificado), y proyecto de Supabase transferido a la organización `divlab-umng` (conservando URL, API keys y datos: 50 labs, 12 bloques activos, 2 perfiles verificados tras la transferencia). Detalle en la sección "Infraestructura y titularidad de cuentas".
 
 **Deuda técnica conocida (no urgente):**
 - La asignación laboratorista↔lab (`lab_admins`) se hace por SQL directo; falta UI para que el jefe la gestione.
 - Al desactivar un bloque (`deactivate_schedule_block`) solo se marca `is_active = false`; las sesiones futuras ya materializadas en `block_sessions` no se limpian (podrían tener reservas). Falta decidir la política de limpieza al revisar el esquema de `block_sessions`.
 - El dashboard no muestra asistencia (tarjeta ni columnas) porque `attended` aún no se registra; `v_lab_usage` ya expone `asistencias`/`inasistencias` para cuando exista el flujo de registro.
 - Faltan generar los tipos de la BD (`lib/types/database.types.ts` con `supabase gen types typescript`); hoy se tipan las consultas a mano con casts.
+- **Falta recrear un usuario de prueba `laboratorista`**: hoy solo existen perfiles `estudiante` (`est.juan.vargas9@unimilitar.edu.co`) y `jefe` (`juans.vargas@unimilitar.edu.co`); sin un laboratorista con lab asignado en `lab_admins`, el panel del laboratorista no es testeable end-to-end.
+- **Vercel sin desplegar**: el "go-live" depende de decisiones institucionales (adopción por la UMNG, subdominio, dominio verificado de Resend, revisión OFITIC/MSPI, cumplimiento Ley 1581). Ver sección de infraestructura.
+- **API keys de Supabase**: hoy se usa la `anon` legacy; Supabase la deprecia a fin de 2026 a favor de `publishable`/`secret`. Migrar al preparar producción, por separado de otros cambios.
+- **Anti-pausa del plan Free**: montar keep-alive o subir a Pro antes de tener tráfico real, para que la DB no se pause por inactividad.
 
 ## Próximo paso sugerido
 
-Iterar el dashboard: añadir gráficos donde aporten (p.ej. demanda por franja en
-barras), incorporar `v_ocupacion_sesion` (ocupación por sesión), y filtros por
-rango de fechas o por lab.
+Infraestructura ya migrada a cuentas institucionales (GitHub + Supabase). Los dos frentes en cola:
 
-Otros pendientes en cola: UI para asignar `lab_admins` (hoy por SQL), generar
-`lib/types/database.types.ts`, la limpieza de `block_sessions` al desactivar un
-bloque, y el registro de asistencia (`attended`) que habilitaría las métricas de
-asistencia del dashboard.
+**Producto:** iterar el dashboard (gráficos donde aporten, p.ej. demanda por franja en barras; incorporar `v_ocupacion_sesion`; filtros por rango de fechas o por lab); recrear el usuario de prueba `laboratorista`; UI para asignar `lab_admins`; generar `lib/types/database.types.ts`; limpieza de `block_sessions` al desactivar un bloque; registro de asistencia (`attended`).
+
+**Institucional / despliegue:** confirmar el modelo de gobernanza con jefatura y coordinación; obtener contactos de la OFITIC (técnico/seguridad) y del área de protección de datos; resolver el cumplimiento de la Ley 1581 (política de tratamiento, autorización en el registro, RNBD, contrato de transmisión, revisión MSPI); y recién entonces montar Vercel y publicar. Considerar un piloto controlado (p.ej. labs de Metales/CIM) antes del despliegue total.
