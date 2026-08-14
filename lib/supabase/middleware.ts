@@ -39,11 +39,21 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // Rutas del flujo público del estudiante: alcanzables SIEMPRE, haya sesión o no.
+  // Si no se distinguen, un laboratorista (o cualquiera con sesión) que entre a
+  // /reservar sale rebotado a su panel y nunca ve la página pública.
+  const isAlwaysPublic =
+    path.startsWith("/reservar") ||          // flujo del estudiante SIN login
+    path.startsWith("/consulta") ||          // seguimiento por código + correo
+    path.startsWith("/registro-personal") || // alta de personal (queda pendiente)
+    path.startsWith("/politica-datos") ||    // habeas data: siempre consultable
+    path.startsWith("/auth");
+
   const isPublic =
     path === "/" ||
-    path.startsWith("/login") ||
-    path.startsWith("/registro") ||
-    path.startsWith("/auth");
+    path.startsWith("/login") || // con sesión abierta sí redirige: ya entraste
+    isAlwaysPublic;
 
   // Sin sesión y ruta protegida → login
   if (!user && !isPublic) {
@@ -59,15 +69,16 @@ export async function updateSession(request: NextRequest) {
     for (const [prefix, needed] of ROUTE_GUARDS) {
       if (path.startsWith(prefix) && role !== needed && role !== "jefe") {
         const url = request.nextUrl.clone();
-        url.pathname = ROLE_HOME[role] ?? "/laboratorios";
+        url.pathname = ROLE_HOME[role] ?? "/reservar";
         return NextResponse.redirect(url);
       }
     }
 
-    // Ya autenticado en login/registro → a su home
-    if (isPublic && !path.startsWith("/auth")) {
+    // Ya autenticado en la landing o el login → a su home.
+    // Las rutas del flujo público quedan exentas: se ven con o sin sesión.
+    if (isPublic && !isAlwaysPublic) {
       const url = request.nextUrl.clone();
-      url.pathname = ROLE_HOME[role] ?? "/laboratorios";
+      url.pathname = ROLE_HOME[role] ?? "/reservar";
       return NextResponse.redirect(url);
     }
   }

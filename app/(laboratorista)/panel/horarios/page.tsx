@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BlockForm } from '@/components/panel/block-form'
 import { BlockList } from '@/components/panel/block-list'
+import { GroupPolicyForm } from '@/components/panel/group-policy-form'
+import { SafetyNotesForm } from '@/components/panel/safety-notes-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +15,7 @@ type Block = {
   start_time: string
   end_time: string
   capacity: number
+  workstations: number | null
 }
 
 export default async function HorariosPage() {
@@ -27,16 +30,28 @@ export default async function HorariosPage() {
   const misLabs = (labsData ?? []) as Lab[]
 
   let blocks: Block[] = []
+  // Política de grupos e instrucciones por lab: my_admin_labs no las trae.
+  const politicas = new Map<string, number | null>()
+  const instrucciones = new Map<string, string | null>()
   const labIds = misLabs.map((l) => l.id)
   if (labIds.length > 0) {
     const { data } = await supabase
       .from('schedule_blocks')
-      .select('id, lab_id, weekday, start_time, end_time, capacity')
+      .select('id, lab_id, weekday, start_time, end_time, capacity, workstations')
       .in('lab_id', labIds)
       .eq('is_active', true)
       .order('weekday')
       .order('start_time')
     blocks = (data ?? []) as Block[]
+
+    const { data: labsInfo } = await supabase
+      .from('laboratories')
+      .select('id, max_group_size, safety_notes')
+      .in('id', labIds)
+    for (const l of labsInfo ?? []) {
+      politicas.set(l.id as string, (l.max_group_size as number | null) ?? null)
+      instrucciones.set(l.id as string, (l.safety_notes as string | null) ?? null)
+    }
   }
 
   return (
@@ -75,6 +90,29 @@ export default async function HorariosPage() {
               <div className="mt-6 border-t border-gray-100 pt-6">
                 <h3 className="mb-3 text-sm font-semibold text-[var(--umng-ink)]">Nuevo bloque</h3>
                 <BlockForm labId={lab.id} />
+              </div>
+
+              {/* Grupos de trabajo: solo tiene sentido donde los puestos son
+                  el recurso escaso (mesas, tornos, celdas de manufactura). */}
+              <div className="mt-6 border-t border-gray-100 pt-6">
+                <h3 className="mb-3 text-sm font-semibold text-[var(--umng-ink)]">
+                  Grupos de trabajo
+                </h3>
+                <GroupPolicyForm
+                  labId={lab.id}
+                  actual={politicas.get(lab.id) ?? null}
+                />
+              </div>
+
+              {/* Lo que el estudiante recibe por correo al aprobarle la práctica */}
+              <div className="mt-6 border-t border-gray-100 pt-6">
+                <h3 className="mb-3 text-sm font-semibold text-[var(--umng-ink)]">
+                  Instrucciones de ingreso
+                </h3>
+                <SafetyNotesForm
+                  labId={lab.id}
+                  actual={instrucciones.get(lab.id) ?? null}
+                />
               </div>
             </section>
           ))}

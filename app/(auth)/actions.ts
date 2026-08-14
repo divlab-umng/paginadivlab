@@ -12,17 +12,28 @@ function isInstitutional(email: string) {
   return email.trim().toLowerCase().endsWith(INSTITUTIONAL_DOMAIN);
 }
 
-// Registro. La validación de dominio ocurre en 3 capas:
-//   (1) UI (login-form)  (2) aquí, en el servidor  (3) trigger en la BD (definitiva).
-export async function signUp(formData: FormData) {
+// NOTA: no existe auto-registro de ESTUDIANTES. Desde el rediseño de agosto
+// 2026 reservan sin cuenta en /reservar. Lo de abajo es solo para PERSONAL.
+
+/**
+ * Alta de personal (laboratoristas y jefatura).
+ * La cuenta nace SIN PERMISOS: el perfil se crea con rol `estudiante` y queda
+ * marcado con `staff_requested_at`. El jefe la habilita desde /dashboard/personal.
+ * Registrarse no otorga acceso a nada.
+ */
+export async function signUpStaff(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const fullName = String(formData.get("full_name") ?? "");
+  const fullName = String(formData.get("full_name") ?? "").trim();
 
+  if (fullName.length < 3) {
+    return { error: "Escribe tu nombre completo." };
+  }
   if (!isInstitutional(email)) {
-    return {
-      error: "Debes registrarte con tu correo institucional @unimilitar.edu.co",
-    };
+    return { error: "Debes registrarte con tu correo institucional @unimilitar.edu.co" };
+  }
+  if (password.length < 8) {
+    return { error: "La contraseña debe tener al menos 8 caracteres." };
   }
 
   const supabase = await createClient();
@@ -30,13 +41,17 @@ export async function signUp(formData: FormData) {
     email,
     password,
     options: {
-      data: { full_name: fullName },
+      // El trigger handle_new_user lee `staff_request` para marcar la solicitud.
+      data: { full_name: fullName, staff_request: "true" },
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
     },
   });
 
-  if (error) return { error: error.message };
-  redirect("/login?verifica=1");
+  if (error) {
+    // El trigger de la BD rechaza dominios no institucionales con su propio mensaje.
+    return { error: error.message };
+  }
+  return { ok: true };
 }
 
 export async function signIn(formData: FormData) {
@@ -54,7 +69,7 @@ export async function signIn(formData: FormData) {
 
   revalidatePath("/", "layout");
   const role = await getUserRole(supabase, data.user.id);
-  redirect(ROLE_HOME[role] ?? "/laboratorios");
+  redirect(ROLE_HOME[role] ?? "/reservar");
 }
 
 export async function signOut() {

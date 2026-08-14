@@ -1,19 +1,20 @@
-// components/auth/login-form.tsx — tarjeta de acceso con identidad UMNG
+// components/auth/login-form.tsx — acceso para personal (laboratoristas y jefe).
+// Los estudiantes NO inician sesión: reservan sin cuenta en /reservar.
+// El auto-registro se retiró; las cuentas de personal las crea el administrador.
 "use client";
 
 import { useState } from "react";
-import { signIn, signUp } from "@/app/(auth)/actions";
+import Link from "next/link";
+import { signIn } from "@/app/(auth)/actions";
 
 export function LoginForm() {
-  const [mode, setMode] = useState<"login" | "registro">("login");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function handle(formData: FormData) {
     setError(null);
     setPending(true);
-    const action = mode === "login" ? signIn : signUp;
-    const result = await action(formData); // en éxito hace redirect y no retorna
+    const result = await signIn(formData); // en éxito hace redirect y no retorna
     setPending(false);
     if (result?.error) setError(result.error);
   }
@@ -26,14 +27,14 @@ export function LoginForm() {
           Universidad Militar Nueva Granada
         </p>
         <h1 className="mt-1 text-2xl font-semibold text-white">
-          Reserva de Laboratorios
+          Acceso del personal
         </h1>
+        <p className="mt-1 text-sm text-white/70">
+          Laboratoristas y jefatura de la División de Laboratorios.
+        </p>
       </div>
 
       <form action={handle} className="space-y-4 px-8 py-8">
-        {mode === "registro" && (
-          <Field label="Nombre completo" name="full_name" type="text" required />
-        )}
         <Field
           label="Correo institucional"
           name="email"
@@ -59,22 +60,31 @@ export function LoginForm() {
           disabled={pending}
           className="w-full rounded-lg bg-[var(--umng-crimson)] px-4 py-2.5 font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
         >
-          {pending ? "Procesando…" : mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === "login" ? "registro" : "login");
-            setError(null);
-          }}
-          className="w-full text-center text-sm text-[var(--umng-navy)] underline-offset-4 hover:underline"
-        >
-          {mode === "login"
-            ? "¿No tienes cuenta? Regístrate"
-            : "¿Ya tienes cuenta? Inicia sesión"}
+          {pending ? "Procesando…" : "Iniciar sesión"}
         </button>
       </form>
+
+      <div className="space-y-2 border-t border-[var(--umng-border)] bg-[var(--umng-surface)] px-8 py-4 text-center">
+        <p className="text-sm text-[var(--umng-muted)]">
+          ¿Eres laboratorista y no tienes cuenta?{" "}
+          <Link
+            href="/registro-personal"
+            className="font-semibold text-[var(--umng-navy)] underline-offset-4 hover:underline"
+          >
+            Solicita acceso
+          </Link>
+        </p>
+        {/* Salida clara para el estudiante que llegó aquí por error */}
+        <p className="text-sm text-[var(--umng-muted)]">
+          ¿Eres estudiante?{" "}
+          <Link
+            href="/reservar"
+            className="font-semibold text-[var(--umng-navy)] underline-offset-4 hover:underline"
+          >
+            Reserva tu práctica sin cuenta
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

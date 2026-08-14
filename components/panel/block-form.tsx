@@ -30,7 +30,7 @@ export function BlockForm({ labId }: { labId: string }) {
   }, [state.ok])
 
   return (
-    <form ref={formRef} action={formAction} className="grid gap-3 sm:grid-cols-5 sm:items-end">
+    <form ref={formRef} action={formAction} className="grid gap-3 sm:grid-cols-6 sm:items-end">
       <input type="hidden" name="lab_id" value={labId} />
 
       <label className="text-sm sm:col-span-2">
@@ -80,7 +80,22 @@ export function BlockForm({ labId }: { labId: string }) {
         />
       </label>
 
-      <div className="sm:col-span-5">
+      {/* Puestos: mesas o equipos. Vacío = sin límite (como funcionaba antes). */}
+      <label className="text-sm">
+        <span className="mb-1 block text-xs font-medium text-[var(--umng-ink)]/70">
+          Puestos
+        </span>
+        <input
+          type="number"
+          name="workstations"
+          min={1}
+          placeholder="Sin límite"
+          title="Mesas o equipos de trabajo. Déjalo vacío si no es una restricción en este laboratorio."
+          className="w-full rounded-md border border-gray-300 px-2 py-2 font-data text-sm"
+        />
+      </label>
+
+      <div className="sm:col-span-6">
         {state.error && (
           <p className="mb-2 text-sm text-[var(--umng-crimson)]">{state.error}</p>
         )}

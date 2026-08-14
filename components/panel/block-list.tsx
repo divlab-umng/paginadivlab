@@ -18,6 +18,7 @@ type Block = {
   start_time: string
   end_time: string
   capacity: number
+  workstations: number | null
 }
 
 const hhmm = (t: string) => (t ? t.slice(0, 5) : t)
@@ -52,6 +53,15 @@ function BlockRow({ block }: { block: Block }) {
         <span className="font-data text-xs text-[var(--umng-ink)]/60">
           aforo {block.capacity}
         </span>
+        {block.workstations !== null && (
+          <span
+            className="font-data text-xs"
+            style={{ color: 'var(--umng-sky-600)' }}
+            title="Puestos de trabajo: cada grupo ocupa uno"
+          >
+            {block.workstations} puestos
+          </span>
+        )}
       </div>
 
       {confirming ? (

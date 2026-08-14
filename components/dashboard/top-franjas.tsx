@@ -57,7 +57,7 @@ export function TopFranjas({
 
   return (
     <ul className="space-y-2">
-      {ranked.map((r, i) => {
+      {ranked.map((r) => {
         const pct = Math.round((100 * (r.solicitudes ?? 0)) / max)
         const labName = labNames[r.lab_id] ?? r.lab_id
         return (
