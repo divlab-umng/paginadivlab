@@ -288,7 +288,7 @@ No hay CLI enlazada (`supabase/config.toml` no existe).
 Hallazgo **verificado** decodificando una foto real del carné con `zxing-cpp`:
 
 - Formato: **CODE 39**
-- Contenido: **el código estudiantil tal cual** (ej. `5601330`), el mismo que el
+- Contenido: **el código estudiantil tal cual** (ej. `1234567`), el mismo que el
   estudiante escribe al reservar → el cruce es directo, sin tabla puente.
 - El número largo del reverso (ej. `1455171579`) es el consecutivo del plástico:
   **no** está en el código de barras y **no** sirve para cruzar.

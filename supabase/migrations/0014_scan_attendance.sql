@@ -5,7 +5,7 @@
 -- Marca la asistencia de UN estudiante a partir del número escaneado de su carné.
 --
 -- HALLAZGO VERIFICADO (ver 0010): el código de barras del carné UMNG es
--- CODE 39 y contiene EXACTAMENTE el código estudiantil (p. ej. '5601330'),
+-- CODE 39 y contiene EXACTAMENTE el código estudiantil (p. ej. '1234567'),
 -- el mismo que el estudiante escribe al reservar. Por eso el cruce es directo
 -- contra students.student_code y no hace falta tabla puente.
 --
@@ -105,7 +105,7 @@ grant execute on function public.mark_attendance_by_code(uuid, text) to authenti
 
 -- ============================================================================
 -- Verificación sugerida (como laboratorista del lab, con una sesión en curso):
---   select * from public.mark_attendance_by_code('<session_id>', '5601330');
+--   select * from public.mark_attendance_by_code('<session_id>', '1234567');
 --   → motivo 'marcado' la primera vez, 'ya_marcado' la segunda.
 --   select * from public.mark_attendance_by_code('<session_id>', '0000000');
 --   → motivo 'sin_reserva'.

@@ -16,7 +16,7 @@
 --
 -- HALLAZGO VERIFICADO (carné UMNG, agosto 2026)
 --   El código de barras del reverso se decodificó con zxing-cpp:
---       Formato = CODE 39      Contenido = '5601330'
+--       Formato = CODE 39      Contenido = '1234567'
 --   Ese valor coincide EXACTAMENTE con el "CÓDIGO" impreso al frente del carné.
 --   El número largo del reverso (p. ej. 1455171579) es el consecutivo del
 --   plástico (card_serial), NO va en el código de barras y NO sirve para cruzar.
@@ -403,12 +403,12 @@ grant execute on function public.session_attendees(uuid)               to authen
 -- 9. VERIFICACIÓN SUGERIDA (ejecutar a mano tras aplicar)
 -- ----------------------------------------------------------------------------
 -- Ejemplo de la pregunta que motivó esta migración:
---   select * from public.student_lab_hours('5601330');
+--   select * from public.student_lab_hours('1234567');
 --
 -- Horas de un estudiante en CIM durante el semestre en curso:
 --   select student_name, lab_code, semestre, horas_aprobadas
 --     from public.v_student_lab_summary
---    where student_code = '5601330' and lab_code = 'CIM';
+--    where student_code = '1234567' and lab_code = 'CIM';
 --
 -- Ranking de estudiantes por horas en un laboratorio:
 --   select student_code, student_name, sum(horas_aprobadas) as horas

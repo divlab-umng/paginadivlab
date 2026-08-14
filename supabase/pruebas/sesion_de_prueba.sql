@@ -14,14 +14,21 @@
 --   · Un bloque horario de prueba en el LABORATORIO CIM.
 --   · Una sesión que arranca en 5 MINUTOS y dura 2 horas (queda dentro de la
 --     ventana de 30 min, así que aparece de inmediato en /panel).
---   · Un estudiante con el código 5601330 y su reserva ya APROBADA.
+--   · Un estudiante de prueba con su reserva ya APROBADA.
 --
--- ⚠️ CAMBIA EL CÓDIGO si vas a escanear otro carné: reemplaza '5601330' por el
---    número que aparece al frente del carné que tengas a mano (las 3 apariciones).
+-- ⚠️ ANTES DE EJECUTARLO: pon en `v_codigo` el número que aparece AL FRENTE del
+--    carné que vayas a escanear (el de arriba, no el del reverso). Es el que
+--    lleva codificado el código de barras en Code 39.
+--
+--    Va como variable y no escrito en el cuerpo a propósito: un código de carné
+--    es un dato personal y este repositorio es público.
 -- ============================================================================
 
 do $$
 declare
+  -- 👇 EL ÚNICO VALOR QUE DEBES CAMBIAR
+  v_codigo text := '0000000';
+
   v_lab    uuid;
   v_sub    uuid;
   v_blk    uuid;
@@ -33,6 +40,10 @@ declare
 begin
   select id into v_lab from public.laboratories where code = 'CIM';
   select id into v_sub from public.subjects     where code = 'AUTOMATIZACION';
+
+  if v_codigo = '0000000' then
+    raise exception 'Escribe tu código de carné en v_codigo, al inicio del bloque.';
+  end if;
 
   if v_lab is null or v_sub is null then
     raise exception 'Falta el lab CIM o la materia AUTOMATIZACION. ¿Aplicaste 0003 y 0009?';
@@ -52,7 +63,7 @@ begin
 
   -- 3) Estudiante canónico (mismo código que trae el código de barras del carné).
   v_est := public.upsert_student(
-    '5601330',
+    v_codigo,
     'Juana Valentina Vargas Borda',
     'juana.prueba@unimilitar.edu.co'
   );
@@ -62,7 +73,7 @@ begin
     (session_id, student_ref, subject_id, student_name, student_email, student_code, status)
   values
     (v_ses, v_est, v_sub, 'Juana Valentina Vargas Borda',
-     'juana.prueba@unimilitar.edu.co', '5601330', 'aprobada')
+     'juana.prueba@unimilitar.edu.co', v_codigo, 'aprobada')
   on conflict do nothing;
 
   raise notice 'Listo. Sesión de prueba en CIM hoy de % a %.', v_inicio, v_fin;
@@ -82,4 +93,4 @@ select lab_code, session_date, start_time, end_time, estado, aprobadas, marcadas
 -- delete from public.schedule_blocks
 --  where lab_id = (select id from public.laboratories where code = 'CIM');
 --
--- delete from public.students where student_code = '5601330';
+-- delete from public.students where student_code = '1234567';
