@@ -87,11 +87,16 @@ Los tres primeros deben dar **3**; los dos últimos, **1**.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | La misma de `.env.local` | Sí |
 | `NEXT_PUBLIC_SITE_URL` | La URL pública de Vercel | Sí |
 | `RESEND_API_KEY` | Clave de Resend | Para los correos — ver `CORREOS.md` |
-| `EMAIL_FROM` | `Laboratorios UMNG <...@unimilitar.edu.co>` | **Solo con dominio verificado** |
+| `EMAIL_FROM` | `Laboratorios UMNG <laboratorios@labs.innovalaboratories.org>` | Recomendada |
 
-> **No definas `EMAIL_FROM` hasta verificar el dominio en Resend.** Sin
-> verificación, el remitente debe seguir siendo `onboarding@resend.dev`, y ese es
-> el valor por defecto del código. Todo el procedimiento está en `CORREOS.md`.
+> **`RESEND_API_KEY` solo en *Production*.** Si la dejas también en Preview, cada
+> rama que despliegues puede mandar correos reales a estudiantes reales.
+
+> **`EMAIL_FROM` es opcional pero conviene definirla.** El código ya trae por
+> defecto el dominio verificado `labs.innovalaboratories.org`, así que funciona
+> aunque se olvide. Definirla explícitamente evita sorpresas el día que se migre
+> al dominio institucional: ahí basta cambiar la variable, sin tocar código.
+> El procedimiento completo está en `DOMINIO-Y-CORREO.md`.
 
 > **`NEXT_PUBLIC_SITE_URL` es la que más se olvida.** Si queda en `localhost`,
 > los enlaces de los correos apuntan al computador de quien desarrolló.
