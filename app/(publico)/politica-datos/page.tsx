@@ -15,7 +15,7 @@ import {
 export const metadata = {
   title: "Política de tratamiento de datos · UMNG",
   description:
-    "Política de tratamiento de datos personales de la plataforma de reserva de laboratorios de la Universidad Militar Nueva Granada.",
+    "Política de tratamiento de datos personales de la plataforma de reserva de laboratorios.",
 };
 
 function Seccion({
@@ -56,18 +56,14 @@ export default function PoliticaDatosPage() {
         <div className="card-elevated px-6 py-8 sm:px-10">
           <p className="text-sm leading-relaxed text-[var(--umng-muted)]">
             Esta política describe cómo la plataforma de reserva de laboratorios
-            de la Universidad Militar Nueva Granada recolecta, usa y protege los
-            datos personales de quienes solicitan prácticas, en cumplimiento de
-            la Ley 1581 de 2012 y el Decreto 1377 de 2013.
+            recolecta, usa y protege los datos personales de quienes solicitan
+            prácticas, en cumplimiento de la Ley 1581 de 2012 y el Decreto 1377
+            de 2013.
           </p>
 
           <Seccion titulo="1. Responsable del tratamiento">
             <p>
               <strong>{RESPONSABLE.nombre}</strong>
-              <br />
-              {RESPONSABLE.direccion}
-              <br />
-              Teléfono: {RESPONSABLE.telefono}
               <br />
               Correo para asuntos de datos personales:{" "}
               <a
@@ -111,7 +107,7 @@ export default function PoliticaDatosPage() {
               <li>Comunicar por correo el estado de la solicitud</li>
               <li>
                 Producir estadísticas de uso de los laboratorios para la
-                planeación de recursos de la División
+                planeación de recursos
               </li>
             </ul>
             <p>
@@ -204,7 +200,7 @@ export default function PoliticaDatosPage() {
 
           <div className="mt-10 rounded-lg bg-[var(--umng-surface)] p-4 text-xs text-[var(--umng-muted)]">
             Documento en revisión por el área de protección de datos de la
-            Universidad Militar Nueva Granada. Versión {POLITICA_VERSION}.
+            institución. Versión {POLITICA_VERSION}.
           </div>
 
           <div className="mt-6">

@@ -386,7 +386,7 @@ function StepIdentity({
           className="mt-0.5 h-4 w-4 shrink-0"
         />
         <span className="text-sm text-[var(--umng-ink)]">
-          Autorizo a la Universidad Militar Nueva Granada a tratar mis datos
+          Autorizo al administrador de la plataforma a tratar mis datos
           personales para gestionar mi práctica de laboratorio y el control de
           asistencia, conforme a la{" "}
           <a
