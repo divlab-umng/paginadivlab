@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getUserRole } from '@/lib/supabase/roles'
@@ -150,7 +151,15 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold text-[var(--umng-navy)]">
+          {/* Retorno al inicio público: desde el dashboard no había forma de
+              volver salvo editando la URL. */}
+          <Link
+            href="/"
+            className="text-sm text-[var(--umng-navy)] hover:underline"
+          >
+            ← Volver al inicio
+          </Link>
+          <h1 className="mt-2 font-display text-2xl font-bold text-[var(--umng-navy)]">
             Panel de control
           </h1>
           <p className="mt-1 text-sm text-[var(--umng-ink)]/70">

@@ -1,4 +1,5 @@
 // app/(laboratorista)/panel/page.tsx — Bandeja de solicitudes + registro de asistencia (laboratorista)
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { RequestInbox } from "@/components/panel/request-inbox";
 import { AttendanceSection } from "@/components/panel/attendance-section";
@@ -209,7 +210,27 @@ export default async function PanelPage() {
           <p className="font-data text-xs uppercase tracking-widest text-white/70">
             UMNG · Panel del laboratorista
           </p>
-          <h1 className="mt-1 text-2xl text-white">Solicitudes pendientes</h1>
+
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl text-white">Solicitudes pendientes</h1>
+
+            {/* Configurar horarios era una ruta que había que escribir a mano.
+                Es la pantalla que más usa el laboratorista después de esta. */}
+            <nav className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/panel/horarios"
+                className="rounded-md border border-white/30 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/15"
+              >
+                Configurar horarios
+              </Link>
+              <Link
+                href="/"
+                className="rounded-md px-3 py-1.5 text-sm text-white/75 transition hover:text-white"
+              >
+                Inicio
+              </Link>
+            </nav>
+          </div>
         </div>
       </header>
 
