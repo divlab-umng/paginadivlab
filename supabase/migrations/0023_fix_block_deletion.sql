@@ -118,6 +118,10 @@ begin
       -- ↓ LA CORRECCIÓN. Sin este join, una franja eliminada seguía ofreciendo
       --   sus sesiones ya generadas.
       join public.schedule_blocks b on b.id = bs.block_id
+      -- Puestos ocupados por grupo. Va después del join normal porque un
+      -- LATERAL puede referenciar todo lo que tenga a su izquierda, y así queda
+      -- a la vista de dónde sale el `bs.id` que recibe.
+      cross join lateral public.session_occupancy(bs.id) o
      where bs.lab_id = v_lab_id
        and b.is_active
        and bs.session_date between v_from and v_to
@@ -210,8 +214,29 @@ delete from public.block_sessions bs
         and r.status in ('pendiente', 'aprobada')
    );
 
--- Verificación: debe salir vacío. Si aparece algo, son franjas eliminadas que
--- todavía tienen estudiantes esperando y hay que resolverlas una por una.
+-- ============================================================================
+-- VERIFICACIÓN
+-- ----------------------------------------------------------------------------
+-- ⚠️ NO BASTA CON QUE LA MIGRACIÓN SE APLIQUE SIN ERROR.
+--    `create or replace function` solo comprueba la SINTAXIS: no valida que las
+--    tablas y los alias que usa el cuerpo existan de verdad. Una función puede
+--    instalarse sin una queja y reventar al primer llamado. Y ni el build de
+--    Next.js ni el typecheck miran dentro de una función de Postgres.
+--
+--    Por eso esta verificación INVOCA la función en vez de mirar el catálogo.
+--    Debe devolver filas con fechas y horas. Si devuelve un error, algo quedó
+--    mal y hay que corregirlo ANTES de que un estudiante abra el calendario.
+-- ============================================================================
+select session_date, start_time, end_time,
+       capacity, reserved, disponibles, puestos_usados, reservable
+  from public.lab_sessions_public('MATERIALES', current_date, current_date + 7)
+ order by session_date, start_time
+ limit 10;
+
+
+-- Segunda comprobación: debe salir VACÍO. Si aparece algo, son franjas ya
+-- eliminadas que todavía tienen estudiantes esperando; hay que resolverlas una
+-- por una antes de darlas por cerradas.
 select l.code                as laboratorio,
        bs.session_date,
        bs.start_time,
