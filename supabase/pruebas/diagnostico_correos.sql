@@ -41,20 +41,24 @@
 -- ----------------------------------------------------------------------------
 -- Se listan solo los laboratorios que tienen horario publicado: son los únicos
 -- donde un estudiante puede llegar a solicitar algo.
+-- OJO CON EL ENUM: `profiles.role` es de tipo `user_role`, no texto. Cualquier
+-- coalesce o concatenación contra una cadena suelta hay que hacerlo sobre
+-- `p.role::text`, o Postgres intenta convertir esa cadena a un valor del enum y
+-- aborta con "invalid input value for enum user_role".
 select
-  l.code                                   as laboratorio,
+  l.code                                     as laboratorio,
   l.name,
-  coalesce(p.email, '(nadie asignado)')    as persona,
-  coalesce(p.role,  '—')                   as rol,
+  coalesce(p.email, '(nadie asignado)')      as persona,
+  coalesce(p.role::text, '—')                as rol,
   case
     when p.id is null
       then '*** NADIE ASIGNADO — este lab no notifica a nadie ***'
     when nullif(btrim(coalesce(p.email, '')), '') is null
       then '*** SIN CORREO en profiles ***'
-    when p.role is distinct from 'laboratorista'
-      then '*** ROL ' || upper(coalesce(p.role, 'nulo')) || ' — solo se notifica a role=laboratorista ***'
+    when p.role is distinct from 'laboratorista'::user_role
+      then '*** ROL ' || upper(coalesce(p.role::text, 'nulo')) || ' — solo se notifica a role=laboratorista ***'
     else 'OK · recibe avisos'
-  end                                      as diagnostico
+  end                                        as diagnostico
 from public.laboratories l
 join (select distinct lab_id
         from public.schedule_blocks
@@ -74,13 +78,13 @@ order by l.code, p.email;
 -- select
 --   p.email,
 --   coalesce(nullif(btrim(p.full_name), ''), '(sin nombre)') as nombre,
---   p.role,
+--   p.role::text                                              as rol,
 --   count(la.lab_id)                                          as labs_asignados,
 --   string_agg(l.code, ', ' order by l.code)                  as cuales,
 --   case
---     when p.role = 'laboratorista' and count(la.lab_id) = 0
+--     when p.role = 'laboratorista'::user_role and count(la.lab_id) = 0
 --       then '*** laboratorista SIN laboratorios — no recibe nada ***'
---     when p.role = 'estudiante'
+--     when p.role = 'estudiante'::user_role
 --       then 'cuenta sin aprobar por el jefe'
 --     else 'OK'
 --   end                                                       as diagnostico
