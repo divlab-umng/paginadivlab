@@ -10,6 +10,12 @@ import {
   type SemestreRow,
 } from '@/components/dashboard/semestre-resumen'
 import { EstadoCorreo } from '@/components/dashboard/estado-correo'
+import { GraficaEstados } from '@/components/dashboard/grafica-estados'
+import {
+  GraficaDemanda,
+  type DemandaLab,
+} from '@/components/dashboard/grafica-demanda'
+import { BarraSesion } from '@/components/panel/barra-sesion'
 import { correoConfigurado } from '@/lib/email/resend'
 
 
@@ -130,7 +136,21 @@ export default async function DashboardPage() {
   const totalRechazadas = usage.reduce((acc, l) => acc + (l.reservas_rechazadas ?? 0), 0)
   const totalCanceladas = usage.reduce((acc, l) => acc + (l.reservas_canceladas ?? 0), 0)
   const totalReservas = totalAprobadas + totalPendientes + totalRechazadas + totalCanceladas
-  const totalLabs = usage.length
+
+
+  // Insumo de la gráfica de barras. Se deriva de `usage`, que ya está en
+  // memoria: no hay consulta adicional ni recorrido extra de la base.
+  const demandaPorLab: DemandaLab[] = usage.map((l) => ({
+    lab_id: l.lab_id,
+    name: l.name,
+    aprobadas: l.reservas_aprobadas ?? 0,
+    pendientes: l.reservas_pendientes ?? 0,
+    total:
+      (l.reservas_aprobadas ?? 0) +
+      (l.reservas_pendientes ?? 0) +
+      (l.reservas_rechazadas ?? 0) +
+      (l.reservas_canceladas ?? 0),
+  }))
 
 
   // Asistencia: el porcentaje se calcula SOLO sobre lo efectivamente
@@ -151,15 +171,7 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          {/* Retorno al inicio público: desde el dashboard no había forma de
-              volver salvo editando la URL. */}
-          <Link
-            href="/"
-            className="text-sm text-[var(--umng-navy)] hover:underline"
-          >
-            ← Volver al inicio
-          </Link>
-          <h1 className="mt-2 font-display text-2xl font-bold text-[var(--umng-navy)]">
+          <h1 className="font-display text-2xl font-bold text-[var(--umng-navy)]">
             Panel de control
           </h1>
           <p className="mt-1 text-sm text-[var(--umng-ink)]/70">
@@ -167,21 +179,27 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <a
-            href="/dashboard/personal"
-            className="rounded-lg border border-[var(--umng-navy)] px-4 py-2.5 text-sm font-semibold text-[var(--umng-navy)] transition hover:bg-[var(--umng-navy)] hover:text-white"
-          >
-            Personal
-          </a>
-          {/* Descarga directa: la ruta genera el .xlsx en el servidor. */}
-          <a
-            href="/dashboard/export"
-            className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
-            style={{ backgroundColor: 'var(--umng-green)' }}
-          >
-            Exportar a Excel
-          </a>
+        <div className="flex flex-col items-end gap-3">
+          <BarraSesion piel="clara" />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/dashboard/personal"
+              className="rounded-lg border border-[var(--umng-navy)] px-4 py-2.5 text-sm font-semibold text-[var(--umng-navy)] transition hover:bg-[var(--umng-navy)] hover:text-white"
+            >
+              Personal
+            </Link>
+            {/* Descarga directa: la ruta genera el .xlsx en el servidor. Se deja
+                como <a> a propósito: con Link, Next intentaría navegar por
+                cliente y no dispararía la descarga. */}
+            <a
+              href="/dashboard/export"
+              className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+              style={{ backgroundColor: 'var(--umng-green)' }}
+            >
+              Exportar a Excel
+            </a>
+          </div>
         </div>
       </header>
 
@@ -196,7 +214,10 @@ export default async function DashboardPage() {
               es lo primero que el jefe debe ver al entrar. */}
           <EstadoCorreo configurado={correoConfigurado()} />
 
-          <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {/* Se retiró la tarjeta "Laboratorios": contaba filas del catálogo,
+              no actividad. El número no cambiaba nunca y ocupaba el mismo
+              espacio que un indicador que sí informa. */}
+          <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatCard label="Reservas aprobadas" value={totalAprobadas} accent="green" />
             <StatCard label="Reservas pendientes" value={totalPendientes} accent="gold" />
             <StatCard
@@ -209,8 +230,22 @@ export default async function DashboardPage() {
               }
               accent="green"
             />
-            <StatCard label="Laboratorios" value={totalLabs} accent="navy" />
             <StatCard label="Total de reservas" value={totalReservas} accent="navy" />
+          </section>
+
+
+          {/* Las dos gráficas se alimentan de `usage`, que ya se consultó arriba
+              para la tabla. Ninguna añade una consulta a la base. */}
+          <section className="grid gap-4 lg:grid-cols-2">
+            <GraficaDemanda labs={demandaPorLab} />
+            <GraficaEstados
+              datos={{
+                aprobadas: totalAprobadas,
+                pendientes: totalPendientes,
+                rechazadas: totalRechazadas,
+                canceladas: totalCanceladas,
+              }}
+            />
           </section>
 
 

@@ -72,8 +72,17 @@ export async function signIn(formData: FormData) {
   redirect(ROLE_HOME[role] ?? "/reservar");
 }
 
+/**
+ * Cierra la sesión y devuelve a la portada pública.
+ *
+ * Va a "/" y no a "/login" a propósito: quien cierra sesión normalmente ha
+ * terminado de trabajar, no quiere volver a entrar. Mandarlo al formulario de
+ * acceso sugiere lo contrario e invita a dejar la sesión abierta "para no tener
+ * que loguearse otra vez", que es justo lo que no queremos en un computador
+ * compartido de laboratorio.
+ */
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/");
 }
