@@ -100,7 +100,10 @@ Estado: **julio 2026** — migrado de cuentas personales a identidad institucion
 
 - **Repositorio**: `github.com/divlab-umng/paginadivlab` (privado). Vive bajo la organización de GitHub `divlab-umng`, propiedad (por ahora) de la cuenta `VARGASBORDA-JS` con el correo institucional verificado y **2FA activo**. Antes estaba en `github.com/VARGASBORDA-JS/paginadivlab` (GitHub deja redirección automática desde la URL vieja).
 - **Supabase**: proyecto `reservas-labs-umng` (ref `fabvriqzqnhzxpxrunil`, región `us-east-1`) bajo la organización `divlab-umng` (tipo Educational, plan Free). La transferencia entre organizaciones **conservó URL y API keys**: `.env.local` no cambió.
-- **Vercel**: aún **sin desplegar**. El montaje se hará cuando el despliegue esté aprobado por la institución (subdominio `unimilitar.edu.co`, dominio verificado de Resend, revisión de la OFITIC). No es "migración" sino montaje limpio.
+- **Vercel**: **desplegado desde agosto de 2026** en plan Hobby. Ver la sección
+  *Despliegue en producción*. La cuenta está a nombre personal
+  (`ingvargas081801@gmail.com`) con el correo institucional como secundario: es
+  la última pieza de infraestructura que falta pasar a la organización.
 
 **Nota operativa (plan Free de Supabase):** los proyectos se pausan tras 7 días de inactividad de la base de datos. La pausa **no borra datos**; se reanuda desde el dashboard ("Resume project"). Pendiente: keep-alive (GitHub Action) o subir a Pro en producción.
 
@@ -179,6 +182,30 @@ Esquema base en `supabase/migrations/0001_init.sql`; el resto son incrementos.
 | `subjects` | Materias (0009). |
 | `subject_labs` | Mapeo materia → laboratorios habilitados (0009). |
 | `students` | **Registro canónico del estudiante** (0010). |
+| `programs` | Carreras (0019). `code` = slug MAYÚSCULAS sin tildes. |
+| `subject_programs` | Mapeo materia → carreras (0019). |
+| `reservation_notification_targets` | *Función*, no tabla: a quién avisar (0021). |
+
+### La cascada carrera → materia → laboratorio (0019)
+
+El estudiante elige en tres pasos, y cada uno filtra al siguiente. Se apoya en
+**dos N:M independientes**, no en una jerarquía:
+
+```
+programs ──subject_programs──> subjects ──subject_labs──> laboratories
+```
+
+Esa independencia es la que resuelve los casos reales:
+
+- **Biomédica** está autorizada en Metales y CIM pero no aporta materias propias:
+  ve las mismas de esas carreras. Una jerarquía rígida no lo permitiría.
+- **Mecánica de Fluidos** (Ambiental) y **Mecánica de Fluidos y Tuberías**
+  (Civil) comparten el Cubo de Práctica, pero cada estudiante solo ve la suya.
+- Una materia puede darse en varios laboratorios y un laboratorio servir a varias
+  carreras, sin duplicar filas.
+
+`reservations.program_id` guarda con qué carrera reservó cada quien: es lo que
+permite después cruzar demanda por programa académico.
 
 ### `students` — la identidad canónica (importante)
 
@@ -277,9 +304,27 @@ Activa en todas las tablas. Helpers: `user_role()`, `is_jefe()`, `is_lab_admin(l
 | `0016_work_groups` | **Grupos de trabajo y puestos** (aforo ≠ equipos). |
 | `0017_staff_management` | **Alta y gestión de personal** (registro + pantalla del jefe). |
 | `0018_data_consent` | **Autorización de tratamiento de datos** (Ley 1581). |
+| `0019_programs_cascade` | **Carreras** (`programs`, `subject_programs`) → cascada de 3 niveles. |
+| `0020_seed_piloto` | Datos del piloto: 4 carreras, 9 materias, horarios de Metales, CIM y Diseño. |
+| `0021_notification_targets` | `reservation_notification_targets`: a quién avisar de cada solicitud. |
+| `0022_lab_safety_notes` | `laboratories.safety_notes`: instrucciones de ingreso por lab. |
+| `0023_fix_block_deletion` | **Franja eliminada seguía en el calendario** + el borrado ahora protege reservas. |
+| `0024_materiales_civil` | Laboratorio de Materiales: Ing. Civil, 6 materias y malla L–V 8:00–17:00. |
+| `0025_cubo_practica` | Cubo de Práctica: Ing. Ambiental, hidráulica y fluidos. |
 
 Se aplican **pegando el archivo completo en el SQL Editor de Supabase**, en orden.
 No hay CLI enlazada (`supabase/config.toml` no existe).
+
+> **No hay registro de qué migración corrió.** Supabase no lo lleva y aquí no se
+> usa la CLI. Para saber el estado real, `supabase/pruebas/diagnostico_migraciones.sql`
+> le pregunta al catálogo si existe cada objeto que cada migración debía crear.
+> Es la única fuente de verdad disponible.
+
+> **Corregir una migración ya aplicada es válido si es idempotente.** Todas las
+> de 0016 en adelante lo son (`create or replace`, `if not exists`,
+> `on conflict`), así que ante un error se arregla el archivo y se vuelve a
+> pegar, en vez de acumular migraciones-parche. No aplica a `drop … cascade`,
+> `add column` sin `if not exists` ni inserts sin `on conflict`.
 
 ---
 
@@ -400,15 +445,32 @@ components/
   panel/barcode-scanner.tsx         cámara + ZXing (Code 39)
   panel/attendance-section.tsx      asistencia manual + escáner
   panel/{request-inbox,decision-buttons,block-form,block-list}.tsx
+  panel/{group-policy-form,safety-notes-form}.tsx
+  panel/barra-sesion.tsx            nav común: vista pública + cerrar sesión
   dashboard/{lab-usage-table,top-franjas,semestre-resumen}.tsx
-  auth/login-form.tsx
+  dashboard/{estado-correo,staff-manager}.tsx
+  dashboard/{grafica-estados,grafica-demanda}.tsx   SVG a mano, sin librería
+  auth/{login-form,staff-register-form}.tsx
 lib/
   supabase/{client,server,middleware,roles}.ts
   email/{resend,templates}.ts
   xlsx.ts                           generador .xlsx sin dependencias
+  politica-datos.ts                 versión, responsable y texto del consentimiento
 proxy.ts                            raíz (convención Next 16, era middleware.ts)
-supabase/migrations/                0001 … 0015
+supabase/migrations/                0001 … 0025
+supabase/pruebas/                   scripts de diagnóstico (NO son migraciones)
+  diagnostico_migraciones.sql       qué migraciones están realmente aplicadas
+  diagnostico_correos.sql           por qué un laboratorista no recibe avisos
+  sesion_de_prueba.sql              sesión inminente para probar el escáner
+.github/workflows/keep-alive.yml    evita que Supabase pause el proyecto Free
 ```
+
+**Las gráficas del dashboard son SVG escrito a mano, no una librería.** El
+proyecto no tiene Chart.js ni Recharts: traer una entera para un anillo de
+cuatro tramos costaría ~150 KB de JavaScript. Un `circle` con `stroke-dasharray`
+hace lo mismo con cero dependencias. Además son **componentes de servidor** (sin
+`'use client'`), así que llegan como HTML. Se alimentan de `v_lab_usage`, que el
+dashboard ya consultaba: **no añaden ni una consulta**.
 
 ---
 
@@ -419,10 +481,82 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 RESEND_API_KEY=            # opcional: sin ella se omiten los correos
-EMAIL_FROM=                # opcional: "Laboratorios UMNG <...@unimilitar.edu.co>"
+EMAIL_FROM=                # opcional: por defecto ya usa el dominio verificado
+DEV_ORIGINS=               # opcional: IPs extra para probar desde el celular
 ```
 
-En producción, `NEXT_PUBLIC_SITE_URL` debe ser la URL pública real, **no** `localhost`.
+**En Vercel (Production) los valores son otros:**
+
+| Variable | Valor | Entornos |
+|---|---|---|
+| `NEXT_PUBLIC_SITE_URL` | `https://labs.innovalaboratories.org` | Production + Preview |
+| `EMAIL_FROM` | `Laboratorios UMNG <laboratorios@labs.innovalaboratories.org>` | Production + Preview |
+| `RESEND_API_KEY` | clave `paginadivlab-prod` | **solo Production** |
+
+`RESEND_API_KEY` se restringe a Production a propósito: si estuviera también en
+Preview, cualquier rama desplegada podría mandar correos reales a estudiantes
+reales — y Preview usa **la misma base de datos** que producción.
+
+Dos detalles que rompen cosas en silencio:
+
+- **`NEXT_PUBLIC_SITE_URL` sin barra final.** El código concatena
+  `${NEXT_PUBLIC_SITE_URL}/auth/callback`; con barra quedaría `//auth/callback`.
+- **Las `NEXT_PUBLIC_*` se incrustan en el build.** Cambiarlas exige
+  **redesplegar**; guardar el valor nuevo no basta.
+
+---
+
+## Despliegue en producción
+
+**En línea desde agosto de 2026.** Guía completa en `DESPLIEGUE.md`.
+
+| | |
+|---|---|
+| **URL principal** | `https://labs.innovalaboratories.org` |
+| **URL alterna** | `https://paginadivlab.vercel.app` (sigue activa, no romper) |
+| Proyecto Vercel | `paginadivlab`, plan Hobby, entorno Production sobre `main` |
+| Repositorio | `divlab-umng/paginadivlab`, **público** |
+
+> **El repositorio es público a propósito.** El plan Hobby de Vercel **no
+> despliega repositorios privados que pertenezcan a una organización de GitHub**.
+> Las alternativas eran pagar Pro (~20 USD/mes) o hacerlo público. Antes de
+> publicarlo se auditó todo el historial: cero claves, ningún `.env` commiteado
+> jamás, y se retiró un código de carné real que figuraba como ejemplo.
+> Los términos del plan Hobby restringen a uso personal no comercial, y una
+> plataforma institucional está en zona gris — es una razón más para migrar a
+> una cuenta institucional.
+
+**El dominio de la app y el del remitente son el mismo a propósito.** Antes la
+app vivía en `paginadivlab.vercel.app` y los correos salían de
+`labs.innovalaboratories.org`: para un filtro de correo eso son tres identidades
+en un mismo mensaje (dice ser de la universidad, viene de un dominio
+desconocido, enlaza a un tercero) — la firma clásica del phishing. Resend lo
+señalaba en *Insights* como **"Ensure link URLs match sending domain"**.
+
+En Cloudflare, `labs` es un **CNAME a Vercel en modo DNS only** (nube gris). Si
+se proxia, Vercel no puede validar el dominio ni emitir el certificado.
+Verificado tras el cambio: los cuatro registros de correo que cuelgan de `labs`
+(`send.labs`, `resend._domainkey.labs`, `_dmarc.labs`, `links.labs`) siguen
+resolviendo — un CNAME solo afecta a su propio nodo, no a sus hijos.
+
+**Qué exige un redespliegue y qué no:**
+
+| Cambio | ¿Redesplegar? |
+|---|---|
+| Horarios, laboratoristas, materias, aforo, instrucciones | **No.** Viven en Supabase, surten efecto al instante. |
+| Migraciones SQL | **No**, pero aplícalas **antes** de mezclar el código que las usa. |
+| Cualquier variable `NEXT_PUBLIC_*` | **Sí**, siempre. Se incrustan en el build. |
+| Código | Sí — `git push origin main` lo dispara solo. |
+
+> **Preview no es un entorno aislado: usa la MISMA base de datos que
+> producción.** Lo que reserves probando en una rama son filas reales. Lo único
+> que sí está separado es el correo, porque `RESEND_API_KEY` solo existe en
+> Production.
+
+**En Supabase → Authentication → URL Configuration** deben estar las tres
+Redirect URLs: la del dominio propio, la de `vercel.app` y `localhost:3000`. Es
+una lista blanca: quitar una deja fuera a quien tenga guardado ese enlace.
+*Confirm email* está **desactivado**; el filtro real es la aprobación del jefe.
 
 ---
 
@@ -445,6 +579,23 @@ migración que las corrigió.
    una columna a un `RETURNS TABLE`, hay que `DROP FUNCTION` primero — y **volver
    a otorgar el `GRANT`**, que se pierde con el DROP. (`0010`, `0013`)
 
+3-bis. **`create or replace function` valida la sintaxis, NO que los alias
+   existan.** Una función puede instalarse sin una sola queja y reventar al
+   primer llamado. Pasó de verdad: al reescribir `lab_sessions_public` para
+   añadirle un `join`, se **sustituyó** la línea del
+   `cross join lateral session_occupancy(bs.id) o` en vez de conservarla,
+   mientras el `select` seguía usando `o.puestos`. La migración se aplicó en
+   verde y el calendario de **todos** los laboratorios murió con
+   `missing FROM-clause entry for table "o"`.
+
+   Ni el build de Next.js ni el typecheck miran dentro de una función de
+   Postgres: TypeScript no valida SQL. Dos reglas que salen de ahí:
+
+   - Al reescribir una función completa, **diferénciala contra la versión
+     anterior** antes de darla por buena. Añadir no es sustituir.
+   - La verificación de una migración debe **invocar** la función, no mirar el
+     catálogo. Que exista no prueba que corra. (`0023`)
+
 4. **Zona horaria.** `session_date` (date) + `start_time`/`end_time` (time sin
    zona) son "reloj de pared" de Colombia; el servidor corre en UTC. **Siempre**:
    `(session_date + hora) at time zone 'America/Bogota'` antes de comparar con `now()`.
@@ -462,7 +613,26 @@ migración que las corrigió.
    flujo nuevo. Un `INNER JOIN` a `profiles` hace **desaparecer** al estudiante de
    la bandeja y de la asistencia. Usar LEFT JOIN + coalesce (ver trampa 2).
 
-8. **Probar desde el celular: la página carga pero nada responde.** Next.js 16
+8. **`profiles.role` es un enum (`user_role`), no texto.** Cualquier `coalesce`
+   o concatenación contra una cadena suelta hay que hacerlo sobre `p.role::text`,
+   o Postgres intenta convertir esa cadena a un valor válido del enum y aborta
+   con `invalid input value for enum user_role`. Consecuencia de fondo: un
+   laboratorista mal configurado **no** tiene un rol raro — tiene uno de los tres
+   válidos que no es el que hace falta, y eso no se ve a simple vista.
+
+9. **"Delivered" en Resend no significa "en la bandeja de entrada".** Significa
+   que el servidor del destinatario aceptó el mensaje (`250 OK`). Lo que pase
+   después —bandeja, spam o cuarentena— lo decide `unimilitar.edu.co` y no deja
+   rastro en Resend. Si un laboratorista dice que no le llegó y Resend marca
+   *Delivered*, el problema está **dentro** de la universidad: revisar la
+   cuarentena de Microsoft 365 (`security.microsoft.com/quarantine`), que es
+   distinta de la carpeta de correo no deseado.
+
+   La gestión más liviana con la OFITIC no es delegar DNS sino pedir que
+   `labs.innovalaboratories.org` entre en la lista de remitentes permitidos del
+   filtro institucional. Es una entrada en Exchange, cosa de minutos.
+
+10. **Probar desde el celular: la página carga pero nada responde.** Next.js 16
    bloquea `/_next/*` cuando `next dev` se abre desde un origen distinto de
    `localhost`. Llega el HTML (renderizado en servidor) pero no el JavaScript, así
    que no hidrata: los botones no hacen nada y **no aparece ningún error en
@@ -543,53 +713,67 @@ confirma que Excel lo aceptará.
   gestión de bloques horarios y registro de asistencia con insignias de estado.
 - **Escáner de carné** Code 39 con cámara trasera, antirrebote, realimentación
   sonora/vibración y entrada manual de respaldo.
-- **Dashboard del jefe**: tarjetas resumen, prácticas por semestre con histórico,
-  uso por laboratorio, franjas más demandadas y **exportación a Excel** (17 columnas).
-- **Correos operativos**: dominio propio `labs.innovalaboratories.org` verificado
-  en Resend, clave configurada y envío confirmado a destinatarios externos.
+- **Dashboard del jefe**: tarjetas resumen, **gráfica de demanda por laboratorio**
+  y **dona de estados** (SVG propio, sin librería y sin consultas extra), prácticas
+  por semestre con histórico, uso por laboratorio, franjas más demandadas,
+  gestión de personal y **exportación a Excel** (17 columnas).
+- **Cerrar sesión y vista pública** en ambos paneles (`components/panel/barra-sesion.tsx`).
+- **Correos operativos**: `labs.innovalaboratories.org` verificado en Resend con
+  **SPF, DKIM y DMARC publicados** y entregas confirmadas a destinatarios externos.
+- **Desplegado en Vercel** sobre el mismo dominio del remitente.
+- **Cascada de 3 niveles** carrera → materia → laboratorio, con 6 carreras y
+  24 materias sembradas.
 - Infraestructura migrada a cuentas institucionales (GitHub + Supabase).
 
 **Deuda técnica conocida:**
 
-- **DMARC pendiente**: falta publicar `_dmarc.labs` en Cloudflare con
-  `v=DMARC1; p=none; rua=mailto:...`. No bloquea el envío, pero mejora la
-  reputación. Verificado por consulta al DNS: hoy no existe.
-- **Dominio no institucional**: los correos salen de `innovalaboratories.org`,
-  registrado a título personal. Renovación automática activa, pero es una
-  dependencia de una persona — el mismo riesgo que se corrigió al migrar GitHub y
-  Supabase a la organización. Migrar al dominio de la UMNG cuando la OFITIC
-  publique los registros.
-- **Revisión jurídica de la política**: `/politica-datos` es un borrador técnico
-  que cubre lo que exige el Decreto 1377, pero **debe aprobarlo el área de
-  protección de datos de la UMNG**, y falta inscribir la base en el RNBD si aplica.
-  También hay que confirmar el correo de contacto en `lib/politica-datos.ts`.
+- **Dominio no institucional**: `innovalaboratories.org` está registrado a título
+  personal. Renovación automática activa, pero depende de una persona — el mismo
+  riesgo que se corrigió al migrar GitHub y Supabase a la organización.
+- **Cuenta de Vercel personal**, con el correo institucional solo como
+  secundario. Es la última pieza sin pasar a la organización.
+- **Los correos llegan a cuarentena en `unimilitar.edu.co`.** Resend los marca
+  *Delivered* y el filtro institucional los retiene: dominio de semanas, sin
+  reputación. Ver la trampa 9. Camino corto: pedir a la OFITIC que lo agregue a
+  remitentes permitidos. Camino de fondo: migrar al dominio institucional.
+- **Revisión jurídica de la política**: `/politica-datos` (versión 1.1) nombra al
+  responsable en genérico y **debe aprobarlo el área de protección de datos**.
+  Falta confirmar que el buzón de habeas data en `lib/politica-datos.ts` exista y
+  lo atienda alguien, e inscribir la base en el RNBD si aplica.
 - **Recuperación de contraseña**: no hay pantalla. Si un laboratorista olvida la
   suya, se resuelve por SQL (`update auth.users set encrypted_password = crypt(...)`).
-- **Materias**: solo hay 3 sembradas (Automatización, Procesos de mecanizado,
-  Tecnología mecánica). Falta cargar el resto y una UI para que el jefe las
-  administre; hoy se añaden por SQL.
-- **`CIM` sin bloques horarios**: aparece habilitado para Automatización pero su
-  calendario sale vacío hasta que su laboratorista publique franjas.
-- Al desactivar un bloque solo se marca `is_active = false`; las sesiones futuras
-  ya materializadas no se limpian. Falta decidir la política.
+- **No hay UI para gestionar materias ni carreras**: se añaden por migración. El
+  jefe sí puede gestionar personal y `lab_admins` desde `/dashboard/personal`.
+- **Laboratorios del piloto sin horario**: Física, Química y el Cubo de Práctica
+  tienen oferta académica pero **ningún bloque publicado**, así que su calendario
+  sale vacío. Se resuelve desde `/panel/horarios`, no por SQL.
+- **Keep-alive sin activar**: falta agregar `SUPABASE_URL` y `SUPABASE_ANON_KEY`
+  como secretos en GitHub Actions y ejecutar el workflow una vez a mano.
 - Faltan los tipos de la BD (`lib/types/database.types.ts` con
   `supabase gen types typescript`); hoy se tipan las consultas a mano con casts.
 - **Rol `estudiante` legado**: los perfiles antiguos siguen en `profiles` y pueden
   iniciar sesión (van a `/reservar`). Decidir si se depuran.
-- **Vercel sin desplegar**; **API keys `anon` legacy** (Supabase las deprecia a
-  fin de 2026 a favor de `publishable`/`secret`); **anti-pausa del plan Free**.
+- **API keys `anon` legacy** (Supabase las deprecia a fin de 2026 a favor de
+  `publishable`/`secret`).
 
 ---
 
 ## Próximo paso sugerido
 
-**Producto:** cargar el catálogo real de materias y su mapeo a laboratorios (hoy
-solo hay 3 de ejemplo) — es lo que más limita una prueba con estudiantes reales.
-Después: UI para que el jefe gestione materias y `lab_admins`, y generar los tipos
-de la BD.
+**Operativo (lo que bloquea el piloto hoy):** que cada laboratorio con oferta
+académica tenga **laboratorista asignado y bloques publicados**. Sin bloques el
+estudiante llega al calendario y lo ve vacío; sin laboratorista asignado nadie
+recibe los avisos. `supabase/pruebas/diagnostico_correos.sql` dice cuáles están
+a medio configurar.
 
-**Institucional / despliegue:** habeas data en el formulario, confirmar el modelo
-de gobernanza con jefatura, contactos de la OFITIC, cumplimiento de la Ley 1581 y
-y retomar la solicitud a la OFITIC para migrar al dominio institucional.
-Recién entonces, montar Vercel. Considerar un
-piloto controlado (p. ej. Metales y CIM) antes del despliegue total.
+**Entregabilidad:** pedir a la OFITIC que agregue `labs.innovalaboratories.org` a
+los remitentes permitidos del filtro institucional. Es una gestión mucho más
+liviana que delegar DNS y resuelve el problema de inmediato.
+
+**Producto:** UI para que el jefe gestione materias y carreras (hoy solo por
+migración), pantalla de recuperación de contraseña, y generar los tipos de la BD.
+
+**Institucional:** aprobación de la política por protección de datos, pasar la
+cuenta de Vercel a la organización, y retomar la solicitud a la OFITIC para
+migrar al dominio institucional — con lo que además desaparecería el problema de
+cuarentena.
