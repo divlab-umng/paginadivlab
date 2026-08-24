@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { BarraSesion } from "@/components/panel/barra-sesion";
+import { WalkInForm } from "@/components/panel/walk-in-form";
 import { RequestInbox } from "@/components/panel/request-inbox";
 import { AttendanceSection } from "@/components/panel/attendance-section";
 
@@ -129,6 +130,49 @@ export default async function PanelPage() {
     };
   });
 
+  // === Catálogos para la entrada inmediata ================================
+  // Tres consultas pequeñas sobre tablas de catálogo, no de actividad: son
+  // decenas de filas y no crecen con el uso. Se hacen aquí, en el servidor,
+  // para que el formulario de walk-in abra ya poblado — con una fila de
+  // estudiantes esperando, cargar los desplegables al abrir se nota.
+  const { data: misLabsData } = await supabase.rpc("my_admin_labs");
+  const misLabs = (misLabsData ?? []) as { id: string; code: string; name: string }[];
+  const misLabIds = misLabs.map((l) => l.id);
+
+  let materiasWalkIn: { id: string; name: string; lab_code: string }[] = [];
+  if (misLabIds.length > 0) {
+    const { data: slData } = await supabase
+      .from("subject_labs")
+      .select("lab_id, subjects!inner ( id, name, is_active )")
+      .in("lab_id", misLabIds);
+
+    const codePorLab = new Map(misLabs.map((l) => [l.id, l.code]));
+    materiasWalkIn = (slData ?? [])
+      .map((row) => {
+        const s = row.subjects as unknown as {
+          id: string;
+          name: string;
+          is_active: boolean;
+        };
+        return {
+          id: s.id,
+          name: s.name,
+          lab_code: codePorLab.get(row.lab_id as string) ?? "",
+          activa: s.is_active,
+        };
+      })
+      .filter((m) => m.activa && m.lab_code)
+      .map(({ id, name, lab_code }) => ({ id, name, lab_code }))
+      .sort((a, b) => a.name.localeCompare(b.name, "es"));
+  }
+
+  const { data: carrerasData } = await supabase
+    .from("programs")
+    .select("id, name")
+    .eq("is_active", true)
+    .order("name");
+  const carrerasWalkIn = (carrerasData ?? []) as { id: string; name: string }[];
+
   // === Registro de asistencia ============================================
   // El RPC ya filtra por labs administrados, sesiones ya terminadas (zona
   // horaria America/Bogota) y sesiones con reservas aprobadas por marcar.
@@ -248,6 +292,20 @@ export default async function PanelPage() {
             Todos quedan como presentes; destilda a quienes no asistieron y
             confirma.
           </p>
+
+          {/* Entrada inmediata: el que llega sin reserva. Va aquí y no en una
+              pantalla aparte porque ocurre en el mismo momento y con el mismo
+              gesto que marcar asistencia. */}
+          {misLabs.length > 0 && (
+            <div className="mt-4">
+              <WalkInForm
+                labs={misLabs.map((l) => ({ code: l.code, name: l.name }))}
+                materias={materiasWalkIn}
+                carreras={carrerasWalkIn}
+              />
+            </div>
+          )}
+
           <div className="mt-4">
             {errAsist ? (
               <p className="rounded-lg bg-surface p-4 text-crimson">
