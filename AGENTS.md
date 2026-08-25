@@ -446,7 +446,8 @@ components/
   panel/attendance-section.tsx      asistencia manual + escáner
   panel/{request-inbox,decision-buttons,block-form,block-list}.tsx
   panel/{group-policy-form,safety-notes-form}.tsx
-  panel/barra-sesion.tsx            nav común: vista pública + cerrar sesión
+  panel/barra-sesion.tsx            nav común de las pantallas con sesión
+  panel/walk-in-form.tsx            entrada inmediata (sin reserva previa)
   dashboard/{lab-usage-table,top-franjas,semestre-resumen}.tsx
   dashboard/{estado-correo,staff-manager}.tsx
   dashboard/{grafica-estados,grafica-demanda}.tsx   SVG a mano, sin librería
@@ -717,7 +718,9 @@ confirma que Excel lo aceptará.
   y **dona de estados** (SVG propio, sin librería y sin consultas extra), prácticas
   por semestre con histórico, uso por laboratorio, franjas más demandadas,
   gestión de personal y **exportación a Excel** (17 columnas).
-- **Cerrar sesión y vista pública** en ambos paneles (`components/panel/barra-sesion.tsx`).
+- **Cerrar sesión** en ambos paneles (`components/panel/barra-sesion.tsx`).
+- **Entrada inmediata (walk-in)**: registrar al estudiante que llega sin reserva,
+  con control de aforo atómico y sin sistema paralelo (migración `0026`).
 - **Correos operativos**: `labs.innovalaboratories.org` verificado en Resend con
   **SPF, DKIM y DMARC publicados** y entregas confirmadas a destinatarios externos.
 - **Desplegado en Vercel** sobre el mismo dominio del remitente.

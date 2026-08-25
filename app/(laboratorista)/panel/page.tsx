@@ -261,7 +261,7 @@ export default async function PanelPage() {
 
             {/* Configurar horarios era una ruta que había que escribir a mano.
                 Es la pantalla que más usa el laboratorista después de esta.
-                El resto (vista pública y cerrar sesión) lo aporta BarraSesion. */}
+                Cerrar sesión lo aporta BarraSesion. */}
             <BarraSesion piel="oscura">
               <Link
                 href="/panel/horarios"
