@@ -281,5 +281,26 @@ try {
   check("el laboratorista confirma al anunciado", false, e.message.split("\n")[0]);
 }
 
+
+// --- Las horas acreditadas deben ser de una practica real, no de la jornada --
+// Regresion de 0028: el comodin abarcaba 06:00-22:00 y acreditaba 16 h por
+// persona, porque v_student_lab_hours calcula (end_time - start_time) de la
+// SESION. Ese numero alimenta el dashboard y el Excel.
+const franjas = await q(
+  `select bs.start_time::text as ini, bs.end_time::text as fin,
+          round(extract(epoch from (bs.end_time - bs.start_time))/3600.0, 2)::float as horas
+     from public.block_sessions bs
+     join public.schedule_blocks b on b.id = bs.block_id and b.is_walk_in`
+);
+check("el comodin genera franjas, no la jornada entera",
+      franjas.length > 0 && franjas.every((f) => f.horas <= 4),
+      franjas.map((f) => `${f.ini.slice(0,5)}-${f.fin.slice(0,5)} (${f.horas}h)`).join(", "));
+
+const [hrs] = await q(
+  `select max(horas)::float as max from public.v_student_lab_hours`
+);
+check("ninguna practica acredita mas de 4 horas", (hrs?.max ?? 0) <= 4,
+      `max = ${hrs?.max}`);
+
 console.log(fallos === 0 ? "\n🟢 TODO VERDE" : `\n🔴 ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);

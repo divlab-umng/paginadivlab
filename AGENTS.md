@@ -311,6 +311,9 @@ Activa en todas las tablas. Helpers: `user_role()`, `is_jefe()`, `is_lab_admin(l
 | `0023_fix_block_deletion` | **Franja eliminada seguía en el calendario** + el borrado ahora protege reservas. |
 | `0024_materiales_civil` | Laboratorio de Materiales: Ing. Civil, 6 materias y malla L–V 8:00–17:00. |
 | `0025_cubo_practica` | Cubo de Práctica: Ing. Ambiental, hidráulica y fluidos. |
+| `0026_walk_in` | **Entrada inmediata**: registrar al que llega sin reserva. |
+| `0027_walk_in_publico` | El estudiante se anuncia solo desde un QR; el laboratorista confirma. |
+| `0028_walk_in_franjas` | **El comodín acreditaba 16 h por persona**: pasa a franjas de 2 h. |
 
 Se aplican **pegando el archivo completo en el SQL Editor de Supabase**, en orden.
 No hay CLI enlazada (`supabase/config.toml` no existe).
