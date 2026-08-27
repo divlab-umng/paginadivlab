@@ -331,6 +331,74 @@ No hay CLI enlazada (`supabase/config.toml` no existe).
 
 ---
 
+## Entrada inmediata (walk-in) — migraciones 0026 a 0028
+
+El estudiante que llega sin reserva. Antes lo rechazaba la regla de 24 horas y
+el laboratorista lo anotaba en un cuaderno: esa práctica no existía para el
+aforo, ni para las métricas, ni para el histórico.
+
+**No es un sistema paralelo.** Un walk-in produce exactamente las mismas filas
+que una reserva normal —`students` + `reservations` + `block_sessions`— solo que
+saltándose la antelación. Por eso `v_student_lab_hours`, el dashboard y el Excel
+lo cuentan sin cambiar una línea. Una tabla `walk_ins` aparte habría obligado a
+tocar cada vista y a mantener dos definiciones de "aforo" que acaban
+contradiciéndose.
+
+### El aforo es de la SESIÓN, no del laboratorio
+
+`walk_in_session(lab_id)` resuelve dónde entra la persona, en este orden:
+
+1. **¿Hay una sesión programada ocurriendo ahora?** Entra en ella. Si a las
+   11:30 hay una práctica de 11:00–12:00 con 18 de 20 ocupados, quedan 19.
+   Crear una sesión paralela habría dejado meter 20 personas más en un
+   laboratorio ya lleno.
+2. **Si no**, una franja de práctica libre de `walk_in_duracion_min` minutos
+   (2 h por defecto), alineada desde medianoche. Su bloque va con
+   `is_active = false`, así que `ensure_sessions` no lo materializa y
+   `lab_sessions_public` no lo ofrece jamás en el calendario del estudiante.
+
+Devuelve la sesión **con el bloqueo ya tomado** (`for update`), el mismo que usa
+el trigger `refresh_session_count`. Por eso dos laboratoristas registrando a la
+vez no pueden pasarse del aforo.
+
+Dos columnas por laboratorio lo gobiernan, ajustables sin tocar código:
+
+```sql
+update public.laboratories
+   set walk_in_capacity = 12, walk_in_duracion_min = 60
+ where code = 'CIM';
+```
+
+### Quién puede hacer qué
+
+| RPC | Rol | Qué produce |
+|---|---|---|
+| `register_walk_in_attendance` | `authenticated` + admin del lab | Reserva **aprobada**, `attended = true`, `checked_in_at` |
+| `request_walk_in_public` | `anon` | Reserva **pendiente**, sin asistencia |
+
+Esa separación es deliberada y es el corazón del diseño. Escribir los datos y
+certificar la presencia son cosas distintas: lo primero puede hacerlo el
+estudiante desde el QR de la puerta (`/entrada/<LAB_CODE>`), lo segundo no.
+
+**Si el estudiante pudiera marcar su propia asistencia, cualquiera lo haría
+desde su casa** y `v_student_lab_hours` dejaría de significar nada — con ella,
+el escáner de carné habría sido trabajo perdido.
+
+**No hay token en el QR, a propósito.** Un token es un identificador al
+portador: basta fotografiarlo y compartirlo para que el grupo entero se
+registre sin ir. Y no hace falta, porque lo público solo crea una solicitud
+pendiente: el peor abuso posible es ruido en una lista, el mismo riesgo que ya
+se acepta en `/reservar`.
+
+**No hace falta pantalla nueva para confirmar.** `register_walk_in_attendance`
+detecta si ya existe una reserva `pendiente` o `aprobada` del mismo código en
+esa sesión y la convierte en asistencia en vez de duplicarla. El laboratorista
+escanea el carné en el formulario que ya usa. Eso cubre tres casos con un solo
+gesto: el que se anunció por QR, el que sí había reservado, y el laboratorista
+que registra dos veces por error.
+
+---
+
 ## El carné estudiantil y el escáner
 
 Hallazgo **verificado** decodificando una foto real del carné con `zxing-cpp`:
@@ -434,6 +502,7 @@ app/
   (publico)/reservar/actions.ts
   (publico)/consulta/page.tsx       seguimiento por código + correo
   (publico)/consulta/actions.ts
+  (publico)/entrada/[lab]/…         destino del QR: el estudiante se anuncia
   (auth)/login/page.tsx             SOLO personal
   (auth)/actions.ts                 signIn / signOut (signUp retirado)
   (laboratorista)/panel/…           bandeja, asistencia, horarios
@@ -445,6 +514,7 @@ components/
   publico/reserva-wizard.tsx        wizard de 3 pasos
   publico/calendario-semanal.tsx    grilla L–S / 6:00–19:00
   publico/consulta-reservas.tsx
+  publico/entrada-form.tsx          autoservicio de entrada inmediata
   panel/barcode-scanner.tsx         cámara + ZXing (Code 39)
   panel/attendance-section.tsx      asistencia manual + escáner
   panel/{request-inbox,decision-buttons,block-form,block-list}.tsx
@@ -466,6 +536,7 @@ supabase/pruebas/                   scripts de diagnóstico (NO son migraciones)
   diagnostico_migraciones.sql       qué migraciones están realmente aplicadas
   diagnostico_correos.sql           por qué un laboratorista no recibe avisos
   sesion_de_prueba.sql              sesión inminente para probar el escáner
+  walk_in.test.mjs                  banco de pruebas en PGlite (37 casos)
 .github/workflows/keep-alive.yml    evita que Supabase pause el proyecto Free
 ```
 
@@ -661,29 +732,52 @@ migración que las corrigió.
     `v_reservas_detalle`), así que hay que recrearlas todas y volver a otorgar
     los `GRANT`. Casi siempre es más barato poner lo nuevo al final. (`0016`)
 
+12. **Las horas de práctica salen de la SESIÓN, no de la persona.**
+
+    ```sql
+    round(extract(epoch from (bs.end_time - bs.start_time)) / 3600.0, 2) as horas
+    ```
+
+    Esa expresión se repite en `v_student_lab_hours`, `v_reservas_detalle`, el
+    dashboard y el Excel. Consecuencia: **crear una sesión ancha infla las horas
+    de todos los que estén en ella**. Ocurrió con el comodín de entrada
+    inmediata: abarcaba 06:00–22:00 y acreditaba 16 horas a quien entrara diez
+    minutos. Se corrigió en `0028` pasando a franjas de 2 h.
+
+    Antes de crear una sesión con un rango amplio, preguntarse qué va a
+    reportar el Excel del jefe. Y ojo con el efecto colateral: una sesión ancha
+    también **agota el aforo del día entero**, porque el cupo es por sesión.
+
 ---
 
 ## Cómo verificar cambios de SQL sin tocar producción
 
-Las migraciones se pueden **reproducir enteras** en un Postgres efímero con
-[PGlite](https://pglite.dev) (WASM, sin instalar nada):
+**Ya existe un banco de pruebas listo: `supabase/pruebas/walk_in.test.mjs`.**
+Reproduce las migraciones **enteras** en un Postgres efímero con
+[PGlite](https://pglite.dev) (WASM) y ejecuta los RPC de verdad.
 
-```js
-import { PGlite } from '@electric-sql/pglite';
-const db = await PGlite.create();
-// Stubs de lo que aporta Supabase:
-await db.exec(`create role anon; create role authenticated; create schema auth;
-  create table auth.users(id uuid primary key default gen_random_uuid(),
-                          email text, raw_user_meta_data jsonb default '{}');
-  create or replace function auth.uid() returns uuid language sql stable
-    as $$ select current_setting('test.uid', true)::uuid $$;`);
-// Luego aplicar 0001…0015 en orden (quitando `create extension pgcrypto`,
-// innecesario porque gen_random_uuid() es nativo desde PG13).
+```
+npm i -D @electric-sql/pglite        # NO está en package.json a propósito:
+                                     # es herramienta de desarrollo
+node supabase/pruebas/walk_in.test.mjs
 ```
 
-Para actuar como un rol concreto: `set test.uid = '<uuid>'` y ajustar
-`profiles.role`. Así se probaron el aforo sin sobrecupo, la ventana de 24 h, el
-fallo parcial del lote y los casos del escáner.
+Sale 0 si todo pasa. Hoy cubre 37 comprobaciones: aforo sin sobrecupo,
+autorización por laboratorio, no duplicar, que el comodín no se filtre al
+calendario del estudiante y que las horas acreditadas sean realistas.
+
+> **Correr la migración no es probarla.** `create or replace function` valida la
+> sintaxis, no que los alias existan: una función se instala en verde y revienta
+> al primer llamado. Pasó con `lab_sessions_public` y dejó el calendario caído
+> para todos los laboratorios. **Cualquier RPC nuevo o reescrito se prueba aquí
+> antes de entregarlo.**
+
+El montaje que hace el script (stubs de `auth.users`, `auth.uid()`, los roles
+`anon`/`authenticated` y la extensión `pgcrypto` de PGlite) sirve de plantilla
+para probar cualquier otra cosa: se copia el archivo, se cambian los casos y se
+ejecuta. Para actuar como un rol concreto basta con `update auth._sesion set uid
+= …` y ajustar `profiles.role` **antes** de abrir sesión — el trigger
+`guard_role_change` impide cambiarlo después.
 
 Para el `.xlsx`, generar el archivo y volver a abrirlo con `openpyxl` en Python
 confirma que Excel lo aceptará.
@@ -722,8 +816,13 @@ confirma que Excel lo aceptará.
   por semestre con histórico, uso por laboratorio, franjas más demandadas,
   gestión de personal y **exportación a Excel** (17 columnas).
 - **Cerrar sesión** en ambos paneles (`components/panel/barra-sesion.tsx`).
-- **Entrada inmediata (walk-in)**: registrar al estudiante que llega sin reserva,
-  con control de aforo atómico y sin sistema paralelo (migración `0026`).
+- **Entrada inmediata (walk-in)**: el que llega sin reserva queda registrado con
+  control de aforo atómico y sin sistema paralelo. El estudiante puede anunciarse
+  solo desde un QR en la puerta (`/entrada/<LAB>`) y el laboratorista confirma su
+  presencia con el carné. Migraciones `0026`–`0028`.
+- **Banco de pruebas sobre Postgres real** (`supabase/pruebas/walk_in.test.mjs`):
+  37 comprobaciones que reproducen todas las migraciones en PGlite y ejecutan
+  los RPC. Nació de una caída en producción; ver la trampa 3-bis.
 - **Correos operativos**: `labs.innovalaboratories.org` verificado en Resend con
   **SPF, DKIM y DMARC publicados** y entregas confirmadas a destinatarios externos.
 - **Desplegado en Vercel** sobre el mismo dominio del remitente.
@@ -778,6 +877,19 @@ liviana que delegar DNS y resuelve el problema de inmediato.
 
 **Producto:** UI para que el jefe gestione materias y carreras (hoy solo por
 migración), pantalla de recuperación de contraseña, y generar los tipos de la BD.
+
+**Walk-in, mejoras identificadas:**
+
+- **No se registra la salida.** Las horas acreditadas son las de la franja, no
+  las de la visita real. Medirlo exigiría un segundo escaneo al salir.
+- **El QR se genera fuera.** El panel muestra el enlace con botón de copiar; el
+  código se produce en cualquier generador y se imprime. Dibujarlo en la
+  aplicación exigiría una librería nueva para algo que se hace una vez por
+  laboratorio.
+- **Las solicitudes anunciadas y no confirmadas no caducan.** Quien se anuncia
+  por QR y no aparece deja una fila `pendiente` ocupando cupo hasta que termine
+  la franja. Con el volumen del piloto no molesta; a escala convendría una
+  limpieza automática.
 
 **Institucional:** aprobación de la política por protección de datos, pasar la
 cuenta de Vercel a la organización, y retomar la solicitud a la OFITIC para
