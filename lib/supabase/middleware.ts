@@ -45,6 +45,7 @@ export async function updateSession(request: NextRequest) {
   // /reservar sale rebotado a su panel y nunca ve la página pública.
   const isAlwaysPublic =
     path.startsWith("/reservar") ||          // flujo del estudiante SIN login
+    path.startsWith("/entrada") ||           // QR de entrada inmediata en la puerta
     path.startsWith("/consulta") ||          // seguimiento por código + correo
     path.startsWith("/registro-personal") || // alta de personal (queda pendiente)
     path.startsWith("/politica-datos") ||    // habeas data: siempre consultable

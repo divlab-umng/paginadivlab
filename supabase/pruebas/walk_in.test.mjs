@@ -210,5 +210,76 @@ const horas = await q(
 check("suma en las métricas por estudiante", horas.length > 0,
       horas.length ? `${horas[0].lab_code}` : "sin filas");
 
+
+// --- Vía pública: el estudiante se anuncia solo -----------------------------
+// Se restaura el aforo: la prueba 5 lo dejó en 1 a propósito para verificar el
+// rechazo, y aquí interesa el camino feliz.
+await q(`update public.block_sessions set capacity = 20`);
+
+// Se ejecuta SIN sesión (auth.uid() = null), como haría el rol `anon`.
+await q(`update auth._sesion set uid = null`);
+
+const publico = (args) =>
+  q(`select * from public.request_walk_in_public($1,$2,$3,$4,$5,$6,$7)`, args);
+
+try {
+  const [r] = await publico([
+    "CIM", "8080808", "Publico Prueba", "publico@unimilitar.edu.co", null, null, "1.1",
+  ]);
+  check("un estudiante se anuncia sin sesión", !!r.reservation_id);
+  check("no lo marca como ya anunciado", r.ya_anunciado === false);
+} catch (e) {
+  check("un estudiante se anuncia sin sesión", false, e.message.split("\n")[0]);
+}
+
+const [pub] = await q(
+  `select r.status::text, r.attended, r.checked_in_at, r.consent_self
+     from public.reservations r where r.student_code = '8080808'`
+);
+check("queda PENDIENTE, no aprobada", pub.status === "pendiente", pub.status);
+check("SIN asistencia marcada", pub.attended === null);
+check("sin hora de ingreso", pub.checked_in_at === null);
+check("consent_self = true (lo dio el titular)", pub.consent_self === true);
+
+// Doble toque: devuelve lo mismo, no duplica.
+const [r2] = await publico([
+  "CIM", "8080808", "Publico Prueba", "publico@unimilitar.edu.co", null, null, "1.1",
+]);
+check("el segundo toque no duplica", r2.ya_anunciado === true);
+
+// Sin autorización de datos, se niega.
+try {
+  await publico(["CIM", "6060606", "Sin Consent", "sc@unimilitar.edu.co", null, null, null]);
+  check("exige autorización de datos", false, "no lanzó error");
+} catch (e) {
+  check("exige autorización de datos", /autorizar el tratamiento/i.test(e.message));
+}
+
+// Correo no institucional, se niega.
+try {
+  await publico(["CIM", "5050505", "Correo Malo", "alguien@gmail.com", null, null, "1.1"]);
+  check("exige correo institucional", false, "no lanzó error");
+} catch (e) {
+  check("exige correo institucional", /institucional/i.test(e.message));
+}
+
+// --- El laboratorista confirma al que se anunció ----------------------------
+await q(`update auth._sesion set uid = $1`, [uid]);
+try {
+  const [conf] = await llamar([
+    "CIM", "8080808", null, null, null, null, "1.1",
+  ]);
+  check("el laboratorista confirma al anunciado", conf.ya_tenia_reserva === true);
+  const [fin] = await q(
+    `select r.status::text, r.attended, r.checked_in_at is not null as hora
+       from public.reservations r where r.student_code = '8080808'`
+  );
+  check("pasa a aprobada", fin.status === "aprobada", fin.status);
+  check("con asistencia marcada", fin.attended === true);
+  check("y hora de ingreso", fin.hora === true);
+} catch (e) {
+  check("el laboratorista confirma al anunciado", false, e.message.split("\n")[0]);
+}
+
 console.log(fallos === 0 ? "\n🟢 TODO VERDE" : `\n🔴 ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);

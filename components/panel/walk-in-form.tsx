@@ -283,6 +283,11 @@ export function WalkInForm({
           </span>
         </div>
 
+        {/* Enlace para que el estudiante se anuncie solo. Convertido en código
+            QR e impreso en la puerta, ahorra el diligenciamiento manual: el
+            laboratorista solo escanea el carné para confirmar. */}
+        <EnlaceAutoServicio labCode={labCode} />
+
         {state.error && (
           <p className="rounded-md border border-[var(--umng-crimson)] bg-red-50 p-3 text-sm text-[var(--umng-ink)]">
             {state.error}
@@ -300,6 +305,55 @@ export function WalkInForm({
           </p>
         )}
       </form>
+    </div>
+  );
+}
+
+/**
+ * Enlace de autoservicio para pegar en la puerta.
+ *
+ * Se muestra el enlace en texto en vez de dibujar el código QR aquí: generarlo
+ * exigiría una librería nueva (~50 KB) para algo que se imprime UNA vez por
+ * laboratorio y se pega con cinta. Con el enlace copiado, cualquier generador
+ * gratuito produce el PNG para imprimir.
+ *
+ * `window.location.origin` y no una variable de entorno: así el enlace siempre
+ * apunta al dominio por el que el laboratorista entró —producción, preview o
+ * localhost— sin depender de que alguien recuerde redesplegar tras cambiarla.
+ */
+function EnlaceAutoServicio({ labCode }: { labCode: string }) {
+  const [copiado, setCopiado] = useState(false);
+  const url =
+    typeof window === "undefined"
+      ? `/entrada/${labCode}`
+      : `${window.location.origin}/entrada/${labCode}`;
+
+  return (
+    <div className="mt-2 rounded-lg border border-dashed border-[var(--umng-navy)]/30 bg-white/60 p-3">
+      <p className="text-xs font-medium text-[var(--umng-ink)]/70">
+        Que el estudiante escriba sus propios datos
+      </p>
+      <p className="mt-0.5 text-xs text-[var(--umng-ink)]/55">
+        Convierte este enlace en un código QR, imprímelo y pégalo en la puerta.
+        Quien lo escanee queda anunciado y tú solo confirmas con el carné.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <code className="flex-1 truncate rounded border border-gray-200 bg-white px-2 py-1 font-data text-xs text-[var(--umng-ink)]/80">
+          {url}
+        </code>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard?.writeText(url).then(() => {
+              setCopiado(true);
+              setTimeout(() => setCopiado(false), 2000);
+            });
+          }}
+          className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium"
+        >
+          {copiado ? "Copiado" : "Copiar"}
+        </button>
+      </div>
     </div>
   );
 }
