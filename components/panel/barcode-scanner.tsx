@@ -1,9 +1,28 @@
 // components/panel/barcode-scanner.tsx
 // Escáner del carné estudiantil con la cámara del celular (Fase 4).
 //
-// El carné UMNG usa CODE 39 y contiene el código estudiantil. El lector se
-// restringe SOLO a ese formato: es más rápido y evita falsos positivos con
-// otros códigos que puedan aparecer en cámara.
+// POR QUÉ ACEPTA VARIOS FORMATOS Y NO SOLO CODE 39
+//   La primera versión se restringía a CODE_39, porque así salió al decodificar
+//   una foto del carné. En campo no leía nada. Restringir el formato es una
+//   optimización que solo vale si se está seguro del formato, y no lo estamos:
+//   un carné puede traer un código distinto en el reverso, y las tandas de
+//   plástico cambian con los años. Si el lector no contempla el formato, no
+//   falla con un aviso: simplemente no ve nada, que es el peor modo de fallar.
+//
+//   El coste de aceptar varias simbologías 1D es CPU, no corrección: el
+//   contenido se valida después contra `students.student_code`.
+//
+// RESOLUCIÓN: SE PIDE EXPLÍCITAMENTE
+//   Sin `width`/`height` el navegador entrega lo que le parece, normalmente
+//   640×480. Un código 1D necesita píxeles horizontales para separar las barras
+//   finas; a esa resolución un Code 39 de siete dígitos a 20 cm suele quedar
+//   por debajo del umbral decodificable. Es la causa silenciosa más común de
+//   "la cámara enciende pero no lee".
+//
+// MODO DIAGNÓSTICO
+//   Muestra el texto crudo y el formato de CUALQUIER código leído, aunque no
+//   corresponda a ninguna reserva. Sin esto, depurar un escáner en campo es
+//   adivinar: no se distingue "no lee" de "lee algo que no esperábamos".
 //
 // REQUISITO DEL NAVEGADOR: la cámara exige contexto seguro (HTTPS o localhost).
 // Si se abre por IP de red local sin HTTPS, el navegador bloquea getUserMedia;
@@ -14,6 +33,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import type { IScannerControls } from "@zxing/browser/esm/common/IScannerControls";
+
+/**
+ * Simbologías 1D que puede traer un carné institucional.
+ * CODE_39 va primera porque es la confirmada en el carné UMNG; el resto están
+ * por si el reverso —o una tanda distinta de plástico— usa otra cosa.
+ */
+const FORMATOS = [
+  BarcodeFormat.CODE_39,
+  BarcodeFormat.CODE_128,
+  BarcodeFormat.CODE_93,
+  BarcodeFormat.ITF,
+  BarcodeFormat.CODABAR,
+  BarcodeFormat.EAN_13,
+  BarcodeFormat.EAN_8,
+  BarcodeFormat.UPC_A,
+  BarcodeFormat.UPC_E,
+];
+
+/** Nombre legible de un formato de ZXing, para el diagnóstico. */
+function nombreFormato(f: number | undefined): string {
+  if (f === undefined || f === null) return "desconocido";
+  return BarcodeFormat[f] ?? String(f);
+}
 
 export type ResultadoEscaneo = {
   ok: boolean;
@@ -42,6 +84,13 @@ export function BarcodeScanner({
   const [ultimo, setUltimo] = useState<ResultadoEscaneo | null>(null);
   const [manual, setManual] = useState("");
   const [iniciando, setIniciando] = useState(true);
+
+  // Diagnóstico: lo ÚLTIMO que la cámara logró decodificar, tal cual, antes de
+  // limpiarlo o cruzarlo con nada. Es lo que distingue "no lee" de "lee algo
+  // distinto a lo que esperábamos", que son dos problemas sin nada en común.
+  const [crudo, setCrudo] = useState<{ texto: string; formato: string } | null>(null);
+  const [resolucion, setResolucion] = useState<string | null>(null);
+  const [verDiagnostico, setVerDiagnostico] = useState(false);
 
   // Realimentación: pitido corto + vibración. Distinto tono según el resultado.
   const beep = useCallback((exito: boolean) => {
@@ -118,18 +167,55 @@ export function BarcodeScanner({
 
       try {
         const hints = new Map();
-        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_39]);
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, FORMATOS);
         hints.set(DecodeHintType.TRY_HARDER, true);
-        const reader = new BrowserMultiFormatReader(hints);
 
-        // Cámara trasera: es la que apunta al carné.
+        // 120 ms entre intentos en vez de los 500 por defecto. Con la mano
+        // temblando y el enfoque yendo y viniendo, dos intentos por segundo
+        // desperdician casi todos los fotogramas nítidos.
+        const reader = new BrowserMultiFormatReader(hints, {
+          delayBetweenScanAttempts: 120,
+          delayBetweenScanSuccess: 800,
+        });
+
+        const video: MediaTrackConstraints = {
+          // Cámara trasera: es la que apunta al carné.
+          facingMode: { ideal: "environment" },
+          // Resolución alta: sin esto el navegador entrega 640×480 y las barras
+          // finas se pierden. `ideal` y no `exact` para que degrade en vez de
+          // fallar si la cámara no llega.
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        };
+
+        // `focusMode` existe en la especificación de Media Capture pero no en
+        // los tipos de TypeScript, así que se asigna aparte. Va dentro de
+        // `advanced` a propósito: una restricción desconocida ahí se ignora en
+        // silencio, mientras que en el nivel superior tumbaría getUserMedia en
+        // los navegadores que no la conocen.
+        (video as { advanced?: unknown[] }).advanced = [{ focusMode: "continuous" }];
+
         const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } } },
+          { video },
           videoRef.current!,
           (result) => {
-            if (result) void procesar(result.getText());
+            if (!result) return;
+            // Se registra SIEMPRE lo leído, aunque luego no cruce con nada.
+            setCrudo({
+              texto: result.getText(),
+              formato: nombreFormato(result.getBarcodeFormat()),
+            });
+            void procesar(result.getText());
           }
         );
+
+        // Resolución realmente concedida: puede ser menor que la pedida y eso
+        // explica por sí solo muchas lecturas fallidas.
+        const pista = videoRef.current?.srcObject as MediaStream | null;
+        const ajustes = pista?.getVideoTracks?.()[0]?.getSettings?.();
+        if (ajustes?.width && ajustes?.height) {
+          setResolucion(`${ajustes.width}×${ajustes.height}`);
+        }
 
         if (cancelado) controls.stop();
         else {
@@ -193,9 +279,49 @@ export function BarcodeScanner({
       )}
 
       {!error && (
-        <p className="mt-2 text-xs text-[var(--umng-muted)]">
-          Apunta al código de barras del reverso del carné. Se registra solo.
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-[var(--umng-muted)]">
+            Apunta al código de barras del carné. Se registra solo.
+          </p>
+          <button
+            type="button"
+            onClick={() => setVerDiagnostico((v) => !v)}
+            className="text-xs text-[var(--umng-navy)] underline underline-offset-2"
+          >
+            {verDiagnostico ? "Ocultar diagnóstico" : "Diagnóstico"}
+          </button>
+        </div>
+      )}
+
+      {/* Diagnóstico: lo que la cámara ve DE VERDAD.
+          Sin esto, "no lee" es indistinguible de "lee otra cosa", y son dos
+          problemas con soluciones opuestas. */}
+      {verDiagnostico && !error && (
+        <div className="mt-2 rounded-lg border border-[var(--umng-navy-100)] bg-white px-3 py-2 text-xs">
+          <p className="text-[var(--umng-muted)]">
+            Resolución de la cámara:{" "}
+            <span className="font-data text-[var(--umng-ink)]">
+              {resolucion ?? "…"}
+            </span>
+            {resolucion && Number(resolucion.split("×")[0]) < 1280 && (
+              <span className="ml-1 text-[var(--umng-crimson)]">
+                (baja: puede impedir la lectura)
+              </span>
+            )}
+          </p>
+          <p className="mt-1 text-[var(--umng-muted)]">Última lectura cruda:</p>
+          {crudo ? (
+            <p className="mt-0.5 font-data break-all text-[var(--umng-ink)]">
+              «{crudo.texto}»{" "}
+              <span className="text-[var(--umng-muted)]">[{crudo.formato}]</span>
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[var(--umng-muted)]">
+              Todavía nada. Si la cámara enfoca bien y esto sigue vacío, el
+              código no está entre los formatos que el lector acepta.
+            </p>
+          )}
+        </div>
       )}
 
       {error && (
