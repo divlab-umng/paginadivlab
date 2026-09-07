@@ -15,8 +15,12 @@ export const dynamic = "force-dynamic";
  * asistencias antiguas siguen intactas en la base, que es de donde salen las
  * métricas del jefe, el Excel y `v_student_lab_hours`. Ocultar y borrar son
  * cosas distintas y aquí solo se hace lo primero.
+ *
+ * 180 días ≈ un semestre completo. El laboratorista conserva a la vista todo
+ * el periodo en curso y solo pierde de pantalla lo del semestre anterior, que
+ * es cuando el historial deja de ser trabajo y pasa a ser archivo.
  */
-const DIAS_HISTORIAL = 30;
+const DIAS_HISTORIAL = 180;
 
 /**
  * Fecha límite como "YYYY-MM-DD", calculada en hora de Colombia.
