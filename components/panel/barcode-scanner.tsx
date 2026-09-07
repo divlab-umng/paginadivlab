@@ -35,20 +35,26 @@ import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import type { IScannerControls } from "@zxing/browser/esm/common/IScannerControls";
 
 /**
- * Simbologías 1D que puede traer un carné institucional.
- * CODE_39 va primera porque es la confirmada en el carné UMNG; el resto están
- * por si el reverso —o una tanda distinta de plástico— usa otra cosa.
+ * Simbologías aceptadas. Tres, no nueve.
+ *
+ * El carné UMNG trae UN solo código, en el reverso, con el código estudiantil.
+ * Decodificado da CODE_39, así que ese es el que importa. Los otros dos están
+ * por si una tanda distinta de plástico usa otra cosa.
+ *
+ * NO SE INCLUYEN ITF NI CODABAR, y es deliberado. Ninguna de las dos lleva
+ * dígito verificador obligatorio, así que con `TRY_HARDER` activo un barrido
+ * parcial o un reflejo pueden producir una lectura VÁLIDA pero equivocada. En
+ * un lector de precios eso es un susto; aquí significaría marcar presente a
+ * otro estudiante, y nadie lo notaría jamás. CODE_128 y CODE_93 sí traen
+ * checksum obligatorio, y CODE_39 en el carné es de longitud conocida.
+ *
+ * Tampoco EAN ni UPC: son simbologías de retail que no aparecen en un carné, y
+ * cada formato de más es una superficie de falso positivo sin contrapartida.
  */
 const FORMATOS = [
   BarcodeFormat.CODE_39,
   BarcodeFormat.CODE_128,
   BarcodeFormat.CODE_93,
-  BarcodeFormat.ITF,
-  BarcodeFormat.CODABAR,
-  BarcodeFormat.EAN_13,
-  BarcodeFormat.EAN_8,
-  BarcodeFormat.UPC_A,
-  BarcodeFormat.UPC_E,
 ];
 
 /** Nombre legible de un formato de ZXing, para el diagnóstico. */
@@ -124,6 +130,12 @@ export function BarcodeScanner({
     async (codigoCrudo: string) => {
       const codigo = codigoCrudo.replace(/\D/g, ""); // Code 39 puede traer '*'
       if (!codigo || procesandoRef.current) return;
+
+      // Descarta lecturas demasiado cortas para ser un código estudiantil.
+      // Un barrido parcial puede decodificar un fragmento y devolverlo como
+      // lectura válida; enviarlo al servidor solo produciría ruido, y en el
+      // peor caso podría coincidir con otra persona de la misma sesión.
+      if (codigo.length < 4) return;
 
       const ahora = Date.now();
       if (
