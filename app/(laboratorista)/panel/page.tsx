@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { BarraSesion } from "@/components/panel/barra-sesion";
 import { WalkInForm } from "@/components/panel/walk-in-form";
+import { qrSvg } from "@/lib/qr";
 import { RequestInbox } from "@/components/panel/request-inbox";
 import { AttendanceSection } from "@/components/panel/attendance-section";
 
@@ -219,6 +220,17 @@ export default async function PanelPage() {
     .order("name");
   const carrerasWalkIn = (carrerasData ?? []) as { id: string; name: string }[];
 
+  // QR de cada laboratorio, dibujado aquí en el servidor. La librería que lo
+  // genera no viaja al navegador: solo el SVG resultante, que son unos pocos KB.
+  //
+  // Se usa NEXT_PUBLIC_SITE_URL y no la cabecera de la petición porque el QR
+  // acaba impreso y pegado en una puerta durante meses: debe apuntar al dominio
+  // definitivo, no al que se haya usado para abrir el panel ese día.
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const qrPorLab: Record<string, string> = Object.fromEntries(
+    misLabs.map((l) => [l.code, qrSvg(`${baseUrl}/entrada/${l.code}`)])
+  );
+
   // === Registro de asistencia ============================================
   // El RPC ya filtra por labs administrados, sesiones ya terminadas (zona
   // horaria America/Bogota) y sesiones con reservas aprobadas por marcar.
@@ -364,6 +376,7 @@ export default async function PanelPage() {
                 labs={misLabs.map((l) => ({ code: l.code, name: l.name }))}
                 materias={materiasWalkIn}
                 carreras={carrerasWalkIn}
+                qrPorLab={qrPorLab}
               />
             </div>
           )}

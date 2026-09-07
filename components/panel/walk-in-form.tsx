@@ -31,10 +31,13 @@ export function WalkInForm({
   labs,
   materias,
   carreras,
+  qrPorLab,
 }: {
   labs: LabOpcion[];
   materias: MateriaOpcion[];
   carreras: CarreraOpcion[];
+  /** SVG del QR de cada laboratorio, ya generado en el servidor. */
+  qrPorLab: Record<string, string>;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [state, formAction, pending] = useActionState(registrarWalkInAction, inicial);
@@ -283,10 +286,10 @@ export function WalkInForm({
           </span>
         </div>
 
-        {/* Enlace para que el estudiante se anuncie solo. Convertido en código
-            QR e impreso en la puerta, ahorra el diligenciamiento manual: el
-            laboratorista solo escanea el carné para confirmar. */}
-        <EnlaceAutoServicio labCode={labCode} />
+        {/* QR para que el estudiante se anuncie solo. Impreso en la puerta,
+            ahorra el diligenciamiento manual: el laboratorista solo escanea el
+            carné para confirmar. */}
+        <AutoServicio labCode={labCode} qr={qrPorLab[labCode] ?? null} />
 
         {state.error && (
           <p className="rounded-md border border-[var(--umng-crimson)] bg-red-50 p-3 text-sm text-[var(--umng-ink)]">
@@ -310,19 +313,27 @@ export function WalkInForm({
 }
 
 /**
- * Enlace de autoservicio para pegar en la puerta.
+ * Autoservicio: el QR que el estudiante escanea para anunciarse solo.
  *
- * Se muestra el enlace en texto en vez de dibujar el código QR aquí: generarlo
- * exigiría una librería nueva (~50 KB) para algo que se imprime UNA vez por
- * laboratorio y se pega con cinta. Con el enlace copiado, cualquier generador
- * gratuito produce el PNG para imprimir.
+ * El SVG llega ya dibujado desde el servidor (`lib/qr.ts`), así que la
+ * librería que lo genera nunca viaja al navegador. Aquí solo se pinta.
  *
- * `window.location.origin` y no una variable de entorno: así el enlace siempre
- * apunta al dominio por el que el laboratorista entró —producción, preview o
- * localhost— sin depender de que alguien recuerde redesplegar tras cambiarla.
+ * Se conserva el enlace en texto con botón de copiar: sirve para mandarlo por
+ * chat, y es el respaldo cuando alguien no puede escanear.
  */
-function EnlaceAutoServicio({ labCode }: { labCode: string }) {
+function AutoServicio({
+  labCode,
+  qr,
+}: {
+  labCode: string;
+  qr: string | null;
+}) {
   const [copiado, setCopiado] = useState(false);
+
+  // `window.location.origin` para el texto copiable: así apunta al dominio por
+  // el que el laboratorista entró. El QR, en cambio, se genera en el servidor
+  // con NEXT_PUBLIC_SITE_URL, porque queda impreso durante meses y debe llevar
+  // al dominio definitivo aunque el panel se haya abierto por otro.
   const url =
     typeof window === "undefined"
       ? `/entrada/${labCode}`
@@ -334,25 +345,49 @@ function EnlaceAutoServicio({ labCode }: { labCode: string }) {
         Que el estudiante escriba sus propios datos
       </p>
       <p className="mt-0.5 text-xs text-[var(--umng-ink)]/55">
-        Convierte este enlace en un código QR, imprímelo y pégalo en la puerta.
-        Quien lo escanee queda anunciado y tú solo confirmas con el carné.
+        Quien escanee este código queda anunciado; tú solo confirmas con el
+        carné.
       </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <code className="flex-1 truncate rounded border border-gray-200 bg-white px-2 py-1 font-data text-xs text-[var(--umng-ink)]/80">
-          {url}
-        </code>
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard?.writeText(url).then(() => {
-              setCopiado(true);
-              setTimeout(() => setCopiado(false), 2000);
-            });
-          }}
-          className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium"
-        >
-          {copiado ? "Copiado" : "Copiar"}
-        </button>
+
+      <div className="mt-3 flex flex-wrap items-start gap-4">
+        {qr && (
+          <div className="shrink-0">
+            {/* Mostrable desde el celular tal cual, sin imprimir nada. */}
+            <div
+              className="h-32 w-32 rounded border border-gray-200 bg-white p-1"
+              dangerouslySetInnerHTML={{ __html: qr }}
+            />
+            <a
+              href={`/panel/qr/${labCode}`}
+              className="mt-1 block text-center text-xs font-semibold text-[var(--umng-navy)] underline underline-offset-2"
+            >
+              Cartel para imprimir
+            </a>
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-[var(--umng-ink)]/55">
+            O comparte el enlace:
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded border border-gray-200 bg-white px-2 py-1 font-data text-xs text-[var(--umng-ink)]/80">
+              {url}
+            </code>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(url).then(() => {
+                  setCopiado(true);
+                  setTimeout(() => setCopiado(false), 2000);
+                });
+              }}
+              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium"
+            >
+              {copiado ? "Copiado" : "Copiar"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
