@@ -8,6 +8,40 @@ import { AttendanceSection } from "@/components/panel/attendance-section";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Ventana del historial visible en el panel.
+ *
+ * Solo afecta a lo que se PINTA. Nada se borra ni se archiva: las reservas y
+ * asistencias antiguas siguen intactas en la base, que es de donde salen las
+ * métricas del jefe, el Excel y `v_student_lab_hours`. Ocultar y borrar son
+ * cosas distintas y aquí solo se hace lo primero.
+ */
+const DIAS_HISTORIAL = 30;
+
+/**
+ * Fecha límite como "YYYY-MM-DD", calculada en hora de Colombia.
+ *
+ * `session_date` llega de Postgres como texto ISO, así que comparar cadenas
+ * ordena igual que comparar fechas y evita construir objetos Date por fila.
+ *
+ * El servidor corre en UTC: a las 20:00 de Bogotá ya es el día siguiente en
+ * UTC, y usar la fecha del servidor movería la ventana un día. Por eso se pide
+ * explícitamente `America/Bogota`. `en-CA` se usa porque es el locale que
+ * produce el formato ISO directamente.
+ */
+function limiteHistorial(dias: number): string {
+  const hoy = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+  }).format(new Date());
+
+  const [a, m, d] = hoy.split("-").map(Number);
+  // Aritmética en UTC sobre una fecha sin hora: inmune al horario de verano y
+  // a los desfases de zona. Aquí `toISOString()` SÍ es seguro —al contrario de
+  // la regla general del proyecto— precisamente porque el Date se construyó a
+  // medianoche UTC y no hay conversión que pueda correr el día.
+  return new Date(Date.UTC(a, m - 1, d - dias)).toISOString().slice(0, 10);
+}
+
 export type SolicitudRow = {
   id: string;
   created_at: string;
@@ -130,6 +164,14 @@ export default async function PanelPage() {
     };
   });
 
+  // La bandeja también se recorta. Una solicitud pendiente cuya práctica ya
+  // pasó hace un mes no se puede atender: aprobarla no metería a nadie a
+  // ninguna parte. Se oculta, pero se CUENTA en pantalla — esconder trabajo
+  // pendiente sin decirlo es cómo se crean los puntos ciegos.
+  const limite = limiteHistorial(DIAS_HISTORIAL);
+  const solicitudesVisibles = solicitudes.filter((s) => s.session_date >= limite);
+  const solicitudesOcultas = solicitudes.length - solicitudesVisibles.length;
+
   // === Catálogos para la entrada inmediata ================================
   // Tres consultas pequeñas sobre tablas de catálogo, no de actividad: son
   // decenas de filas y no crecen con el uso. Se hacen aquí, en el servidor,
@@ -179,7 +221,13 @@ export default async function PanelPage() {
   const { data: sesionesRaw, error: errAsist } = await supabase.rpc(
     "attendance_sessions"
   );
-  const sesiones = (sesionesRaw ?? []) as AsistenciaSesion[];
+  const sesionesTodas = (sesionesRaw ?? []) as AsistenciaSesion[];
+
+  // Se recorta ANTES de buscar los asistentes: así tampoco se traen de la base
+  // las personas de sesiones que de todos modos no se van a pintar.
+  const desde = limiteHistorial(DIAS_HISTORIAL);
+  const sesiones = sesionesTodas.filter((s) => s.session_date >= desde);
+  const sesionesOcultas = sesionesTodas.length - sesiones.length;
 
   // Asistentes aprobados de esas sesiones (mismo patrón de perfiles aparte).
   const sesionIds = sesiones.map((s) => s.session_id);
@@ -281,7 +329,17 @@ export default async function PanelPage() {
               No se pudieron cargar las solicitudes. Intenta recargar la página.
             </p>
           ) : (
-            <RequestInbox solicitudes={solicitudes} />
+            <>
+              <RequestInbox solicitudes={solicitudesVisibles} />
+              {solicitudesOcultas > 0 && (
+                <p className="mt-3 text-xs text-muted">
+                  {solicitudesOcultas}{" "}
+                  {solicitudesOcultas === 1 ? "solicitud" : "solicitudes"} de
+                  prácticas anteriores a {DIAS_HISTORIAL} días no se muestran.
+                  Siguen guardadas y cuentan en las estadísticas.
+                </p>
+              )}
+            </>
           )}
         </section>
 
@@ -312,7 +370,19 @@ export default async function PanelPage() {
                 No se pudo cargar la asistencia. Intenta recargar la página.
               </p>
             ) : (
-              <AttendanceSection sesiones={sesionesAsistencia} />
+              <>
+                <AttendanceSection sesiones={sesionesAsistencia} />
+                {sesionesOcultas > 0 && (
+                  <p className="mt-3 text-xs text-muted">
+                    {sesionesOcultas}{" "}
+                    {sesionesOcultas === 1
+                      ? "práctica anterior"
+                      : "prácticas anteriores"}{" "}
+                    a {DIAS_HISTORIAL} días no se muestran aquí. Nada se borró:
+                    siguen en el histórico y en el Excel del jefe.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </section>
