@@ -375,5 +375,33 @@ try {
   check("y acepta la combinacion declarada", false, e.message.split("\n")[0]);
 }
 
+
+// --- Imagenes Diagnosticas: UNA materia en DOS laboratorios -----------------
+// Llego escrita de dos formas; la Division confirmo que es la misma asignatura
+// dictada con enfoque distinto en cada sitio. Duplicarla habria partido en dos
+// sus horas en v_student_lab_hours.
+const imagenes = await q(
+  `select s.code, count(*)::int as labs
+     from public.oferta_academica o
+     join public.subjects s on s.id = o.subject_id
+    where s.name ilike '%imágenes diagn%'
+    group by s.code`
+);
+check("Imagenes Diagnosticas es UNA sola materia", imagenes.length === 1,
+      imagenes.map((i) => i.code).join(", ") || "ninguna");
+check("y se dicta en dos laboratorios", imagenes[0]?.labs === 2,
+      `labs = ${imagenes[0]?.labs}`);
+const [{ n: huerfana }] = await q(
+  `select count(*)::int as n from public.subjects where code = 'LAB_IMAGENES_DIAG'`
+);
+check("no queda la materia duplicada", huerfana === 0);
+
+// Procesamiento Digital: SI son dos, con enfoque propio por carrera.
+const [{ n: procs }] = await q(
+  `select count(*)::int as n from public.subjects
+    where code in ('PROC_DIGITAL_SENALES','PROCESAMIENTO_DIGITAL')`
+);
+check("Procesamiento Digital sigue siendo dos materias", procs === 2, `= ${procs}`);
+
 console.log(fallos === 0 ? "\n🟢 TODO VERDE" : `\n🔴 ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);
