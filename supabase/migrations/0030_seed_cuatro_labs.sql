@@ -40,12 +40,14 @@
 --   se llaman parecido —el enfoque lo da la CARRERA—. La primera se modela con
 --   una materia y dos filas de oferta; la segunda, con dos materias.
 --
--- INSTRUMENTACIÓN BIOMÉDICA: PENDIENTE DE CONFIRMAR
---   Conviven "Biosensores", "Instrumentación Biomédica" e "Instrumentación
---   Biomédica y Biosensores". Sin confirmación de la División se registran tal
---   como llegaron: unificarlas después es un UPDATE, mientras que separar dos
---   que se fusionaron por error exige reconstruir a mano qué reserva era de
---   cuál.
+-- INSTRUMENTACIÓN BIOMÉDICA: TRES ASIGNATURAS (confirmado)
+--   "Biosensores", "Instrumentación Biomédica" e "Instrumentación Biomédica y
+--   Biosensores" son tres asignaturas distintas del plan de Biomédica, y las
+--   tres se cursan en Biomecatrónica. El parecido de los nombres es solo eso.
+--
+--   Se deja anotado porque a primera vista parece un error de captura —la
+--   tercera parece la suma de las dos primeras— y alguien podría "corregirlo"
+--   fusionándolas. No lo son.
 --
 -- IDEMPOTENTE.
 -- ============================================================================

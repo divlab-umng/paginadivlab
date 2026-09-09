@@ -403,5 +403,18 @@ const [{ n: procs }] = await q(
 );
 check("Procesamiento Digital sigue siendo dos materias", procs === 2, `= ${procs}`);
 
+
+// Las tres de instrumentacion son distintas y las tres viven en Biomecatronica.
+const instrum = await q(
+  `select s.code from public.oferta_academica o
+     join public.subjects s on s.id = o.subject_id
+     join public.laboratories l on l.id = o.lab_id
+    where l.code = 'BIOMECATRONICA'
+      and s.code in ('BIOSENSORES','INSTRUM_BIOMEDICA','INSTRUM_BIOMEDICA_BIOSENS')
+    order by s.code`
+);
+check("las tres de instrumentacion estan en Biomecatronica", instrum.length === 3,
+      instrum.map((r) => r.code).join(", "));
+
 console.log(fallos === 0 ? "\n🟢 TODO VERDE" : `\n🔴 ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);
