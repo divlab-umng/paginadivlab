@@ -302,5 +302,78 @@ const [hrs] = await q(
 check("ninguna practica acredita mas de 4 horas", (hrs?.max ?? 0) <= 4,
       `max = ${hrs?.max}`);
 
+
+// --- Oferta academica: carrera x materia x laboratorio ----------------------
+// Regresion de 0029/0030. Con dos relaciones independientes, un estudiante de
+// Biomedica que eligiera "Electronica" veia tambien Biomecatronica, donde solo
+// Mecatronica cursa esa materia. El modelo no podia expresar la combinacion.
+const ofertaBmed = await q(
+  `select l.code from public.oferta_de_carrera(
+     (select id from public.programs where code = 'BIOMEDICA')) o
+     join public.laboratories l on l.code = o.lab_code
+    where o.subject_code = 'ELECTRONICA' order by l.code`
+).catch(() => []);
+const ofertaMec = await q(
+  `select l.code from public.oferta_de_carrera(
+     (select id from public.programs where code = 'MECATRONICA')) o
+     join public.laboratories l on l.code = o.lab_code
+    where o.subject_code = 'ELECTRONICA' order by l.code`
+).catch(() => []);
+
+const codsB = ofertaBmed.map((r) => r.code).join(",");
+const codsM = ofertaMec.map((r) => r.code).join(",");
+check("Biomedica ve Electronica en 2 laboratorios",
+      ofertaBmed.length === 2 && !codsB.includes("BIOMECATRONICA"), codsB);
+check("Mecatronica la ve en 3", ofertaMec.length === 3, codsM);
+check("y Biomecatronica solo aparece para Mecatronica",
+      codsM.includes("BIOMECATRONICA") && !codsB.includes("BIOMECATRONICA"));
+
+// El trigger debe rechazar la combinacion que antes se colaba.
+const [blkBio] = await q(
+  `insert into public.schedule_blocks (lab_id, weekday, start_time, end_time, capacity)
+   select id, 3, '09:00', '11:00', 10 from public.laboratories where code='BIOMECATRONICA'
+   returning id`
+);
+const [sesBio] = await q(
+  `insert into public.block_sessions (block_id, lab_id, session_date, start_time, end_time, capacity)
+   select $1, lab_id, current_date + 7, '09:00', '11:00', 10
+     from public.schedule_blocks where id = $1 returning id`, [blkBio.id]
+);
+check("la sesion de prueba se creo con id", !!sesBio?.id);
+
+try {
+  await q(
+    `insert into public.reservations
+       (session_id, student_ref, subject_id, program_id, student_name, student_email, student_code, status)
+     values ($1,
+       (select id from public.students limit 1),
+       (select id from public.subjects where code='ELECTRONICA'),
+       (select id from public.programs where code='BIOMEDICA'),
+       'X Y', 'xy@unimilitar.edu.co', '4242424', 'pendiente')`,
+    [sesBio.id]
+  );
+  check("el trigger rechaza carrera+materia+lab no declarado", false, "no lanzo error");
+} catch (e) {
+  check("el trigger rechaza carrera+materia+lab no declarado",
+        /no cursa esta materia en este laboratorio/i.test(e.message));
+}
+
+// Y debe permitir la que si esta declarada.
+try {
+  await q(
+    `insert into public.reservations
+       (session_id, student_ref, subject_id, program_id, student_name, student_email, student_code, status)
+     values ($1,
+       (select id from public.students limit 1),
+       (select id from public.subjects where code='ELECTRONICA'),
+       (select id from public.programs where code='MECATRONICA'),
+       'X Y', 'xy@unimilitar.edu.co', '4343434', 'pendiente')`,
+    [sesBio.id]
+  );
+  check("y acepta la combinacion declarada", true);
+} catch (e) {
+  check("y acepta la combinacion declarada", false, e.message.split("\n")[0]);
+}
+
 console.log(fallos === 0 ? "\n🟢 TODO VERDE" : `\n🔴 ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);

@@ -8,6 +8,78 @@ import { POLITICA_VERSION } from "@/lib/politica-datos";
 
 export type Integrante = { nombre: string; correo: string; codigo: string };
 
+export type Subject = { id: string; code: string; name: string };
+export type Lab = { code: string; name: string };
+
+/** Oferta de UNA carrera: sus materias y, por materia, dónde se dictan. */
+export type OfertaCarrera = {
+  subjects: Subject[];
+  labsBySubject: Record<string, Lab[]>;
+};
+
+/**
+ * Carga la oferta de una carrera en una sola llamada.
+ *
+ * POR QUÉ NO SE CARGA TODO EL CATÁLOGO DE ENTRADA
+ *   La versión anterior traía todas las materias y todos los mapeos al abrir
+ *   la página. Con tres laboratorios eso eran unas decenas de filas; con los
+ *   cincuenta previstos serían cientos viajando al celular de cada estudiante
+ *   para mostrar únicamente las de su carrera.
+ *
+ *   Ahora la portada trae solo las carreras —una lista corta que no crece con
+ *   los laboratorios— y esto se pide al elegir una. El tamaño de la respuesta
+ *   depende del plan de estudios de esa carrera, no de cuántos laboratorios
+ *   existan en total.
+ *
+ * POR QUÉ UNA SOLA LLAMADA Y NO DOS
+ *   Se podría pedir las materias al elegir carrera y los laboratorios al
+ *   elegir materia. Serían dos esperas en vez de una, y la segunda caería
+ *   justo en medio de la decisión del estudiante. Traer las dos cosas juntas
+ *   cuesta unas pocas filas más y hace que el resto de la cascada sea
+ *   instantáneo.
+ */
+export async function cargarOfertaCarrera(
+  programId: string
+): Promise<OfertaCarrera> {
+  const vacio: OfertaCarrera = { subjects: [], labsBySubject: {} };
+  if (!programId) return vacio;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("oferta_de_carrera", {
+    p_program_id: programId,
+  });
+  if (error) return vacio;
+
+  const filas = (data ?? []) as {
+    subject_id: string;
+    subject_code: string;
+    subject_name: string;
+    lab_code: string;
+    lab_name: string;
+  }[];
+
+  // La consulta devuelve una fila por combinación materia×laboratorio; aquí se
+  // pliega a la forma que el wizard ya sabía consumir.
+  const porMateria = new Map<string, Subject>();
+  const labsBySubject: Record<string, Lab[]> = {};
+
+  for (const f of filas) {
+    if (!porMateria.has(f.subject_id)) {
+      porMateria.set(f.subject_id, {
+        id: f.subject_id,
+        code: f.subject_code,
+        name: f.subject_name,
+      });
+    }
+    (labsBySubject[f.subject_id] ??= []).push({
+      code: f.lab_code,
+      name: f.lab_name,
+    });
+  }
+
+  return { subjects: [...porMateria.values()], labsBySubject };
+}
+
 export type ResultadoFranja = {
   session_id: string;
   ok: boolean;

@@ -9,6 +9,8 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import { CalendarioSemanal, type Sesion } from "@/components/publico/calendario-semanal";
 import {
   solicitarReservas,
+  cargarOfertaCarrera,
+  type OfertaCarrera,
   type ResultadoFranja,
   type Integrante,
 } from "@/app/(publico)/reservar/actions";
@@ -28,15 +30,7 @@ function tituloLimpio(name: string) {
   return name.replace(/^LABORATORIO\s+/i, "");
 }
 
-export function ReservaWizard({
-  programs,
-  subjectsByProgram,
-  labsBySubject,
-}: {
-  programs: Program[];
-  subjectsByProgram: SubjectsByProgram;
-  labsBySubject: LabsBySubject;
-}) {
+export function ReservaWizard({ programs }: { programs: Program[] }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Paso 1 — identidad
@@ -57,6 +51,15 @@ export function ReservaWizard({
   const [programId, setProgramId] = useState<string | null>(null);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [labCode, setLabCode] = useState<string | null>(null);
+
+  // La oferta de la carrera elegida. Se pide al servidor en vez de recibir el
+  // catálogo completo como propiedad: con cincuenta laboratorios, mandarlo
+  // entero para mostrar las materias de una sola carrera no escala.
+  const [oferta, setOferta] = useState<OfertaCarrera>({
+    subjects: [],
+    labsBySubject: {},
+  });
+  const [cargandoOferta, startOferta] = useTransition();
 
   // Paso 3 — franjas elegidas, grupo de trabajo y envío
   const [seleccion, setSeleccion] = useState<Sesion[]>([]);
@@ -89,13 +92,10 @@ export function ReservaWizard({
     !errors.fullName && !errors.email && !errors.code && autoriza;
 
   // Cada nivel de la cascada depende del anterior.
-  const enabledSubjects = useMemo(
-    () => (programId ? subjectsByProgram[programId] ?? [] : []),
-    [programId, subjectsByProgram]
-  );
+  const enabledSubjects = oferta.subjects;
   const enabledLabs = useMemo(
-    () => (subjectId ? labsBySubject[subjectId] ?? [] : []),
-    [subjectId, labsBySubject]
+    () => (subjectId ? oferta.labsBySubject[subjectId] ?? [] : []),
+    [subjectId, oferta.labsBySubject]
   );
 
   const selectedProgram = programs.find((p) => p.id === programId) ?? null;
@@ -110,6 +110,16 @@ export function ReservaWizard({
     setSeleccion([]);
     setMaxGrupo(null);
     setIntegrantes([]);
+
+    // La oferta se pide aquí, en el manejador del cambio, y no en un efecto:
+    // es la consecuencia directa de una acción del usuario, no una
+    // sincronización con un sistema externo. Va dentro de una transición para
+    // que la interfaz no se bloquee mientras llega.
+    setOferta({ subjects: [], labsBySubject: {} });
+    if (!id) return;
+    startOferta(async () => {
+      setOferta(await cargarOfertaCarrera(id));
+    });
   }
 
   function selectSubject(id: string) {
@@ -195,6 +205,7 @@ export function ReservaWizard({
             subjectId={subjectId}
             enabledLabs={enabledLabs}
             labCode={labCode}
+            cargando={cargandoOferta}
             onSelectProgram={selectProgram}
             onSelectSubject={selectSubject}
             onSelectLab={selectLab}
@@ -464,6 +475,7 @@ function StepSubjectLab({
   subjectId,
   enabledLabs,
   labCode,
+  cargando,
   onSelectProgram,
   onSelectSubject,
   onSelectLab,
@@ -474,6 +486,8 @@ function StepSubjectLab({
   subjectId: string | null;
   enabledLabs: Lab[];
   labCode: string | null;
+  /** La oferta de la carrera viaja del servidor: hay una espera perceptible. */
+  cargando: boolean;
   onSelectProgram: (id: string) => void;
   onSelectSubject: (id: string) => void;
   onSelectLab: (code: string) => void;
@@ -505,10 +519,12 @@ function StepSubjectLab({
             label="Materia"
             value={subjectId ?? ""}
             onChange={onSelectSubject}
-            disabled={!programId}
+            disabled={!programId || cargando}
             placeholder={
               !programId
                 ? "Primero elige tu carrera"
+                : cargando
+                ? "Cargando tus materias…"
                 : enabledSubjects.length === 0
                 ? "Tu carrera no tiene materias configuradas"
                 : "Selecciona la materia…"
