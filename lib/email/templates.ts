@@ -41,6 +41,12 @@ const limpio = (n: string) => n.replace(/^LABORATORIO\s+/i, "");
  * desde su panel, en texto libre. Un `&` en "Gafas & guantes" o un `<` en
  * "temperatura < 40°" romperían la maqueta del mensaje, y cualquier etiqueta
  * pegada por accidente se interpretaría como HTML.
+ *
+ * Con más razón todo lo que viene del formulario PÚBLICO de /reservar (nombre,
+ * compañeros de grupo, nota de material): lo escribe cualquiera, sin login. Sin
+ * escapar, un "nombre" con `<a href="…">` llegaría como enlace dentro de un
+ * correo legítimo de Laboratorios UMNG, desde el dominio verificado: phishing
+ * servido por la propia plataforma. Cualquier campo nuevo pasa por aquí.
  */
 function escapar(s: string) {
   return s
@@ -135,12 +141,12 @@ export function correoNuevaSolicitud(params: {
       (s) => `
       <tr><td style="padding:10px 12px;border:1px solid ${BORDER};border-radius:8px;">
         <p style="margin:0;font-size:14px;font-weight:bold;color:${INK};">
-          ${s.estudiante} <span style="font-family:monospace;font-weight:normal;color:${MUTED};">${s.codigo}</span>
+          ${escapar(s.estudiante)} <span style="font-family:monospace;font-weight:normal;color:${MUTED};">${escapar(s.codigo)}</span>
           ${s.enGrupo ? `<span style="font-size:11px;color:${NAVY};"> · grupo</span>` : ""}
         </p>
         <p style="margin:4px 0 0;font-size:13px;color:${MUTED};">
           ${fechaLarga(s.sessionDate)} · ${hhmm(s.startTime)}–${hhmm(s.endTime)}
-          ${s.materia ? ` · ${s.materia}` : ""}
+          ${s.materia ? ` · ${escapar(s.materia)}` : ""}
         </p>
       </td></tr>
       <tr><td style="height:8px;"></td></tr>`
@@ -149,7 +155,7 @@ export function correoNuevaSolicitud(params: {
 
   const contenido = `
     <p style="margin:0 0 16px;font-size:15px;">Hola${
-      params.laboratorista ? ` <strong>${params.laboratorista}</strong>` : ""
+      params.laboratorista ? ` <strong>${escapar(params.laboratorista)}</strong>` : ""
     },</p>
     <p style="margin:0 0 16px;font-size:14px;color:${MUTED};">
       ${plural ? "Tienes" : "Tienes"} <strong style="color:${INK};">${n} ${
@@ -212,7 +218,7 @@ export function correoPracticaAprobada(params: {
   const seguridad = vinetasSeguridad(params.instrucciones);
 
   const contenido = `
-    <p style="margin:0 0 16px;font-size:15px;">Hola <strong>${params.nombre}</strong>,</p>
+    <p style="margin:0 0 16px;font-size:15px;">Hola <strong>${escapar(params.nombre)}</strong>,</p>
     <p style="margin:0 0 18px;font-size:14px;color:${MUTED};">
       Tu solicitud fue <strong style="color:${GREEN};">aprobada</strong>. Ya tienes tu cupo
       reservado para la práctica.
@@ -234,17 +240,17 @@ export function correoPracticaAprobada(params: {
         ${
           params.materia
             ? `<p style="margin:0 0 2px;font-size:11px;color:${MUTED};text-transform:uppercase;letter-spacing:1px;">Materia</p>
-               <p style="margin:0 0 14px;font-size:14px;color:${INK};">${params.materia}</p>`
+               <p style="margin:0 0 14px;font-size:14px;color:${INK};">${escapar(params.materia)}</p>`
             : ""
         }
 
         <p style="margin:0 0 2px;font-size:11px;color:${MUTED};text-transform:uppercase;letter-spacing:1px;">Código de estudiante</p>
-        <p style="margin:0;font-size:14px;font-family:monospace;color:${INK};">${params.codigo}</p>
+        <p style="margin:0;font-size:14px;font-family:monospace;color:${INK};">${escapar(params.codigo)}</p>
 
         ${
           params.companeros && params.companeros.length > 0
             ? `<p style="margin:14px 0 2px;font-size:11px;color:${MUTED};text-transform:uppercase;letter-spacing:1px;">Grupo de trabajo</p>
-               <p style="margin:0;font-size:14px;color:${INK};">${params.companeros.join(", ")}</p>`
+               <p style="margin:0;font-size:14px;color:${INK};">${params.companeros.map(escapar).join(", ")}</p>`
             : ""
         }
       </td></tr>
