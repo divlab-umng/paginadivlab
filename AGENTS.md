@@ -12,6 +12,9 @@ Plataforma web para gestión, monitoreo y reserva de prácticas en los laborator
 de la Universidad Militar Nueva Granada (UMNG). Gestiona **únicamente el aforo
 físico** (cupo para entrar al laboratorio). El préstamo de máquinas, equipos o
 materiales está **fuera de alcance**: no crear lógica de inventario.
+El campo *Observaciones o material requerido* de `/reservar` (`0031`) es una
+**nota libre** que el laboratorista lee, no un préstamo: sin catálogo de equipos,
+sin estados de préstamo, sin descuento de stock. Que siga siendo solo eso.
 
 ## Stack
 
@@ -314,6 +317,9 @@ Activa en todas las tablas. Helpers: `user_role()`, `is_jefe()`, `is_lab_admin(l
 | `0026_walk_in` | **Entrada inmediata**: registrar al que llega sin reserva. |
 | `0027_walk_in_publico` | El estudiante se anuncia solo desde un QR; el laboratorista confirma. |
 | `0028_walk_in_franjas` | **El comodín acreditaba 16 h por persona**: pasa a franjas de 2 h. |
+| `0029_oferta_academica` | Oferta carrera × materia × laboratorio (trigger que valida la combinación). |
+| `0030_seed_cuatro_labs` | Cuatro laboratorios nuevos con su oferta. |
+| `0031_material_requerido` | `reservations.material_requerido` (nota libre, ≤ 500) + `p_material` en `request_group_reservations_public`. |
 
 Se aplican **pegando el archivo completo en el SQL Editor de Supabase**, en orden.
 No hay CLI enlazada (`supabase/config.toml` no existe).
@@ -530,6 +536,7 @@ lib/
   email/{resend,templates}.ts
   xlsx.ts                           generador .xlsx sin dependencias
   politica-datos.ts                 versión, responsable y texto del consentimiento
+  material-requerido.ts             tope (500) y normalización de la nota de material
 proxy.ts                            raíz (convención Next 16, era middleware.ts)
 supabase/migrations/                0001 … 0025
 supabase/pruebas/                   scripts de diagnóstico (NO son migraciones)
@@ -792,7 +799,8 @@ confirma que Excel lo aceptará.
   INSERT/UPDATE directo a `reservations`.
 - No exponer datos personales en URLs. Respetar RLS: nunca filtrar en el cliente
   lo que debe filtrar la base de datos.
-- No introducir lógica de inventario/préstamo de equipos.
+- No introducir lógica de inventario/préstamo de equipos. La nota de material
+  requerido (`0031`) es texto libre y así debe quedarse.
 - `code` de laboratorio: slug en MAYÚSCULAS sin tildes, sin el prefijo
   "LABORATORIO" (p. ej. `METALES`, `AUTOMATIZACION_CONTROL`).
 
@@ -820,6 +828,11 @@ confirma que Excel lo aceptará.
   control de aforo atómico y sin sistema paralelo. El estudiante puede anunciarse
   solo desde un QR en la puerta (`/entrada/<LAB>`) y el laboratorista confirma su
   presencia con el carné. Migraciones `0026`–`0028`.
+- **Observaciones o material requerido** (`0031`): textarea opcional en el paso 3
+  de `/reservar`. La nota llega a la bandeja del laboratorista y al correo de
+  aviso (escapada). Se guarda en todas las filas de un grupo. El RPC la limpia
+  (blanco → `NULL`) y la recorta a 500 aunque el navegador no lo haga. Banco:
+  `supabase/pruebas/material_requerido.test.mjs` (15 casos).
 - **Banco de pruebas sobre Postgres real** (`supabase/pruebas/walk_in.test.mjs`):
   37 comprobaciones que reproducen todas las migraciones en PGlite y ejecutan
   los RPC. Nació de una caída en producción; ver la trampa 3-bis.
