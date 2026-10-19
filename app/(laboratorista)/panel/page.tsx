@@ -61,6 +61,8 @@ export type SolicitudRow = {
   // Grupo de trabajo (migración 0016). null = solicitud individual.
   group_id: string | null;
   is_group_leader: boolean;
+  // Nota libre del estudiante (0031). null = no pidió nada.
+  material_requerido: string | null;
 };
 
 // --- Tipos de asistencia ---
@@ -104,7 +106,7 @@ export default async function PanelPage() {
     .from("reservations")
     .select(
       `id, created_at, student_id, student_ref, student_name, student_email, student_code,
-       group_id, is_group_leader,
+       group_id, is_group_leader, material_requerido,
        students ( full_name, email, student_code ),
        block_sessions!inner (
          session_date, start_time, end_time,
@@ -166,6 +168,7 @@ export default async function PanelPage() {
       end_time: s.end_time,
       group_id: (r.group_id as string | null) ?? null,
       is_group_leader: Boolean(r.is_group_leader),
+      material_requerido: (r.material_requerido as string | null) ?? null,
     };
   });
 

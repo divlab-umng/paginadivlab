@@ -7,6 +7,7 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { CalendarioSemanal, type Sesion } from "@/components/publico/calendario-semanal";
+import { MAX_MATERIAL } from "@/lib/material-requerido";
 import {
   solicitarReservas,
   cargarOfertaCarrera,
@@ -46,6 +47,8 @@ export function ReservaWizard({ programs }: { programs: Program[] }) {
   });
   // Autorización de tratamiento de datos (Ley 1581). Sin esto no se puede reservar.
   const [autoriza, setAutoriza] = useState(false);
+  // Nota opcional: material o equipo que necesita del laboratorio (0031).
+  const [material, setMaterial] = useState("");
 
   // Paso 2 — cascada carrera → materia → laboratorio
   const [programId, setProgramId] = useState<string | null>(null);
@@ -159,6 +162,7 @@ export function ReservaWizard({ programs }: { programs: Program[] }) {
         integrantes: admiteGrupos ? integrantes : [],
         autorizaDatos: autoriza,
         programId,
+        materialRequerido: material,
       });
       if (res.ok) setResultados(res.resultados);
       else setErrorEnvio(res.error);
@@ -226,6 +230,8 @@ export function ReservaWizard({ programs }: { programs: Program[] }) {
             maxGrupo={maxGrupo ?? 1}
             integrantes={integrantes}
             onIntegrantes={setIntegrantes}
+            material={material}
+            onMaterial={setMaterial}
             error={errorEnvio}
           />
         )}
@@ -632,6 +638,8 @@ function StepHorario({
   maxGrupo,
   integrantes,
   onIntegrantes,
+  material,
+  onMaterial,
   error,
 }: {
   labCode: string;
@@ -646,6 +654,8 @@ function StepHorario({
   maxGrupo: number;
   integrantes: Integrante[];
   onIntegrantes: (v: Integrante[]) => void;
+  material: string;
+  onMaterial: (v: string) => void;
   error: string | null;
 }) {
   const ordenadas = [...seleccion].sort((a, b) =>
@@ -688,6 +698,9 @@ function StepHorario({
         />
       )}
 
+      {/* Observaciones o material requerido: opcional, para todos los labs */}
+      <MaterialRequerido valor={material} onChange={onMaterial} />
+
       {/* Carrito de franjas elegidas */}
       {ordenadas.length > 0 && (
         <div className="mt-5 rounded-xl border border-[var(--umng-sky)] bg-[var(--umng-sky-50)] p-4">
@@ -727,6 +740,55 @@ function StepHorario({
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------------- */
+/* Observaciones o material requerido (0031)                                */
+/* ----------------------------------------------------------------------- */
+// Una NOTA para el laboratorista, no un préstamo: no hay inventario detrás y
+// el texto lo dice, para que nadie lo lea como una reserva del equipo.
+function MaterialRequerido({
+  valor,
+  onChange,
+}: {
+  valor: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="mt-5">
+      <label
+        htmlFor="material-requerido"
+        className="text-sm font-semibold text-[var(--umng-navy)]"
+      >
+        Observaciones o material requerido{" "}
+        <span className="font-normal text-[var(--umng-muted)]">(opcional)</span>
+      </label>
+      <p
+        id="material-requerido-ayuda"
+        className="mt-1 text-xs text-[var(--umng-muted)]"
+      >
+        ¿Necesitas que el laboratorio te preste algo? Una cámara, un buril para
+        mecanizado, herramientas específicas… Escríbelo aquí y el laboratorista lo
+        verá al revisar tu solicitud. Sujeto a disponibilidad.
+      </p>
+      <textarea
+        id="material-requerido"
+        rows={3}
+        maxLength={MAX_MATERIAL}
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        aria-describedby="material-requerido-ayuda material-requerido-contador"
+        placeholder="Ej.: cámara réflex con trípode; buril de 1/4 para el torno"
+        className="field-lg mt-2 min-h-[5.5rem] resize-y bg-white text-sm"
+      />
+      <p
+        id="material-requerido-contador"
+        className="mt-1 text-right font-data text-xs text-[var(--umng-muted)]"
+      >
+        {valor.length}/{MAX_MATERIAL}
+      </p>
     </div>
   );
 }

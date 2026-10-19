@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { enviarCorreo } from "@/lib/email/resend";
 import { correoNuevaSolicitud } from "@/lib/email/templates";
 import { POLITICA_VERSION } from "@/lib/politica-datos";
+import { normalizarMaterial } from "@/lib/material-requerido";
 
 export type Integrante = { nombre: string; correo: string; codigo: string };
 
@@ -114,6 +115,8 @@ export async function solicitarReservas(input: {
   autorizaDatos?: boolean;
   /** Carrera elegida. No se deduce de la materia: una materia puede ser de varias. */
   programId?: string | null;
+  /** Nota opcional: material o equipo que necesita del laboratorio (0031). */
+  materialRequerido?: string | null;
 }): Promise<ResultadoSolicitud> {
   if (input.sessionIds.length === 0) {
     return { ok: false, error: "No seleccionaste ninguna franja horaria." };
@@ -126,6 +129,9 @@ export async function solicitarReservas(input: {
       error: "Debes autorizar el tratamiento de tus datos personales para reservar.",
     };
   }
+
+  // Misma normalización que hace el RPC; se reutiliza abajo para el correo.
+  const material = normalizarMaterial(input.materialRequerido);
 
   const supabase = await createClient();
 
@@ -140,6 +146,7 @@ export async function solicitarReservas(input: {
     p_members: input.integrantes ?? [],
     p_consent_version: POLITICA_VERSION,
     p_program_id: input.programId ?? null,
+    p_material: material,
   });
 
   if (error) {
@@ -211,6 +218,8 @@ export async function solicitarReservas(input: {
               endTime: f.end_time,
               enGrupo: f.en_grupo,
             })),
+            // Toda la solicitud comparte la misma nota: se envía una vez.
+            materialRequerido: material,
           });
           await enviarCorreo({ para: t.admin_email, asunto, html });
         }

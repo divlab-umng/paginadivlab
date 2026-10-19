@@ -123,6 +123,8 @@ export function correoNuevaSolicitud(params: {
     endTime: string;
     enGrupo: boolean;
   }[];
+  /** Nota libre del estudiante (0031). Viene del formulario: se ESCAPA. */
+  materialRequerido?: string | null;
 }) {
   const sitio = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const n = params.solicitudes.length;
@@ -156,6 +158,17 @@ export function correoNuevaSolicitud(params: {
       a la espera de tu aprobación.
     </p>
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${filas}</table>
+    ${
+      params.materialRequerido
+        ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:4px;">
+      <tr><td style="padding:12px;background:${SURFACE};border:1px solid ${BORDER};border-radius:8px;">
+        <p style="margin:0;font-size:12px;font-weight:bold;letter-spacing:0.04em;color:${NAVY};">MATERIAL SOLICITADO</p>
+        <p style="margin:6px 0 0;font-size:14px;color:${INK};">${escapar(
+          params.materialRequerido
+        ).replace(/\n/g, "<br>")}</p>
+      </td></tr></table>`
+        : ""
+    }
     <p style="margin:20px 0 0;">
       <a href="${sitio}/panel"
          style="display:inline-block;background:${CRIMSON};color:#ffffff;text-decoration:none;

@@ -85,6 +85,9 @@ export function RequestInbox({ solicitudes }: { solicitudes: SolicitudRow[] }) {
       <ul className="space-y-3">
         {bloques.map((b) => {
           const cab = b.solicitudes[0];
+          // En un grupo todos comparten la nota (0031): basta mostrarla una vez.
+          const nota =
+            b.solicitudes.find((s) => s.material_requerido)?.material_requerido ?? null;
           return (
             <li key={b.clave} className="rounded-xl border bg-white p-5">
               {/* Cabecera común: laboratorio y franja */}
@@ -168,6 +171,18 @@ export function RequestInbox({ solicitudes }: { solicitudes: SolicitudRow[] }) {
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {/* Material o equipo que pidió el estudiante. Es una nota, no un préstamo. */}
+              {nota && (
+                <div className="mt-3 rounded-lg border border-[var(--umng-navy-100)] bg-[var(--umng-navy-50)] px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--umng-navy)]">
+                    Material solicitado
+                  </p>
+                  <p className="mt-1 whitespace-pre-line break-words text-sm text-ink">
+                    {nota}
+                  </p>
+                </div>
               )}
             </li>
           );
