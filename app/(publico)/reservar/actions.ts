@@ -197,6 +197,28 @@ export async function solicitarReservas(input: {
           subject_name: string | null;
           en_grupo: boolean;
         };
+        // Correo de cada solicitante, por código de estudiante.
+        //
+        // No se pide al RPC: `upsert_student` guarda EXACTAMENTE el correo que
+        // llegó en el formulario (minúsculas, sin espacios) y reemplaza el que
+        // hubiera, así que el de la solicitud y el de la base son el mismo dato.
+        // Tomarlo de aquí evita cambiar el tipo de retorno del RPC (trampa 3:
+        // DROP FUNCTION + volver a otorgar el GRANT) por un dato que ya se tiene.
+        // La normalización es la misma que aplica la base de datos.
+        const soloDigitos = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
+        const correoPorCodigo = new Map<string, string>();
+        for (const p of [
+          { codigo: input.code, correo: input.email },
+          ...(input.integrantes ?? []),
+        ]) {
+          const codigo = soloDigitos(p.codigo);
+          const correo = (p.correo ?? "").trim().toLowerCase();
+          // Gana el primero (el líder): el RPC descarta a un compañero con su mismo código.
+          if (codigo && correo && !correoPorCodigo.has(codigo)) {
+            correoPorCodigo.set(codigo, correo);
+          }
+        }
+
         const porAdmin = new Map<string, { t: Target; filas: Target[] }>();
         for (const t of (targets ?? []) as Target[]) {
           const clave = `${t.admin_email}|${t.lab_name}`;
@@ -212,6 +234,7 @@ export async function solicitarReservas(input: {
             solicitudes: fs.map((f) => ({
               estudiante: f.student_name ?? "Estudiante",
               codigo: f.student_code ?? "",
+              correo: correoPorCodigo.get(soloDigitos(f.student_code)) ?? null,
               materia: f.subject_name,
               sessionDate: f.session_date,
               startTime: f.start_time,

@@ -123,6 +123,8 @@ export function correoNuevaSolicitud(params: {
   solicitudes: {
     estudiante: string;
     codigo: string;
+    /** Correo institucional del solicitante. Viene del formulario: se ESCAPA. */
+    correo?: string | null;
     materia: string | null;
     sessionDate: string;
     startTime: string;
@@ -144,6 +146,13 @@ export function correoNuevaSolicitud(params: {
           ${escapar(s.estudiante)} <span style="font-family:monospace;font-weight:normal;color:${MUTED};">${escapar(s.codigo)}</span>
           ${s.enGrupo ? `<span style="font-size:11px;color:${NAVY};"> · grupo</span>` : ""}
         </p>
+        ${
+          s.correo
+            ? `<p style="margin:2px 0 0;font-size:13px;">
+          <a href="mailto:${escapar(s.correo)}" style="color:${NAVY};text-decoration:none;">&#9993; ${escapar(s.correo)}</a>
+        </p>`
+            : ""
+        }
         <p style="margin:4px 0 0;font-size:13px;color:${MUTED};">
           ${fechaLarga(s.sessionDate)} · ${hhmm(s.startTime)}–${hhmm(s.endTime)}
           ${s.materia ? ` · ${escapar(s.materia)}` : ""}
