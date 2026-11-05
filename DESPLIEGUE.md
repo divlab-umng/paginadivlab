@@ -84,10 +84,17 @@ Los tres primeros deben dar **3**; los dos últimos, **1**.
 | Variable | Valor | Obligatoria |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | La misma de `.env.local` | Sí |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | La misma de `.env.local` | Sí |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | La llave **publishable** (`sb_publishable_…`), la misma de `.env.local`. Tipo **Config** | Sí |
 | `NEXT_PUBLIC_SITE_URL` | La URL pública de Vercel | Sí |
 | `RESEND_API_KEY` | Clave de Resend | Para los correos — ver `CORREOS.md` |
 | `EMAIL_FROM` | `Laboratorios UMNG <laboratorios@labs.innovalaboratories.org>` | Recomendada |
+
+> **La llave de Supabase va como *Config*, no como *Secret*.** Vercel no deja
+> guardar como Secret una variable que empiece por `NEXT_PUBLIC_` (muestra
+> "Remove the public framework prefix…"), y un Secret ya guardado no se puede
+> convertir: hay que borrarlo y crearlo de nuevo. Usa la **publishable**
+> (Supabase → Project Settings → API Keys), no la legacy `eyJ…`, que Supabase
+> retira a comienzos de 2027. **Nunca** pongas la `sb_secret_…`.
 
 > **`RESEND_API_KEY` solo en *Production*.** Si la dejas también en Preview, cada
 > rama que despliegues puede mandar correos reales a estudiantes reales.
@@ -116,10 +123,14 @@ El repositorio incluye `.github/workflows/keep-alive.yml`. Para activarlo, en
 GitHub → **Settings → Secrets and variables → Actions**:
 
 - `SUPABASE_URL` = la misma URL de Supabase
-- `SUPABASE_ANON_KEY` = la misma clave anon
+- `SUPABASE_ANON_KEY` = la misma llave **publishable** (`sb_publishable_…`)
 
 Luego ve a la pestaña **Actions**, elige *Keep-alive Supabase* y ejecútalo a mano
 una vez con **Run workflow** para comprobar que responde `HTTP 200`.
+
+Activo desde noviembre de 2026 (lunes y jueves, 7:00 Colombia). GitHub apaga los
+workflows programados tras 60 días sin commits: si llega el correo de aviso, se
+reactiva con un clic en la pestaña Actions.
 
 ---
 

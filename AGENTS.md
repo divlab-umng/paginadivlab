@@ -108,7 +108,7 @@ Estado: **julio 2026** — migrado de cuentas personales a identidad institucion
   (`ingvargas081801@gmail.com`) con el correo institucional como secundario: es
   la última pieza de infraestructura que falta pasar a la organización.
 
-**Nota operativa (plan Free de Supabase):** los proyectos se pausan tras 7 días de inactividad de la base de datos. La pausa **no borra datos**; se reanuda desde el dashboard ("Resume project"). Pendiente: keep-alive (GitHub Action) o subir a Pro en producción.
+**Nota operativa (plan Free de Supabase):** los proyectos se pausan tras 7 días de inactividad de la base de datos. La pausa **no borra datos**; se reanuda desde el dashboard ("Resume project"). **Mitigado** desde noviembre de 2026 con el keep-alive de GitHub Actions (ver *Despliegue en producción*). Si el repositorio pasa 60 días sin commits, GitHub desactiva el workflow programado: se reactiva desde la pestaña Actions.
 
 **Modelo de gobernanza (propuesto, a confirmar con jefatura/coordinación):**
 - Dueño funcional del proceso: **División de Laboratorios**.
@@ -467,9 +467,12 @@ pero no ante definitivos (clave inválida, dominio sin verificar). Si falta
 El panel del jefe muestra el estado y permite enviar un correo de prueba.
 
 ⚠️ Las plantillas usan **estilos en línea y tablas**, no clases ni variables CSS:
-Gmail y Outlook descartan `<style>`. No "modernizar" ese HTML. Y el texto libre
-del laboratorista **se escapa** antes de insertarlo (`escapar`): sin eso, un `&`
-o un `<` rompen la maqueta del mensaje.
+Gmail y Outlook descartan `<style>`. No "modernizar" ese HTML. Y **todo texto
+que escribe una persona se escapa** antes de insertarlo (`escapar`): las
+instrucciones del laboratorista y, sobre todo, lo que llega del formulario
+público (nombre, compañeros de grupo, nota de material). Sin eso, un `&` o un `<`
+rompen la maqueta, y un "nombre" con `<a href>` llegaría como enlace dentro de un
+correo legítimo de Laboratorios UMNG. Cualquier campo nuevo pasa por `escapar`.
 
 ---
 
@@ -538,7 +541,7 @@ lib/
   politica-datos.ts                 versión, responsable y texto del consentimiento
   material-requerido.ts             tope (500) y normalización de la nota de material
 proxy.ts                            raíz (convención Next 16, era middleware.ts)
-supabase/migrations/                0001 … 0025
+supabase/migrations/                0001 … 0031
 supabase/pruebas/                   scripts de diagnóstico (NO son migraciones)
   diagnostico_migraciones.sql       qué migraciones están realmente aplicadas
   diagnostico_correos.sql           por qué un laboratorista no recibe avisos
@@ -560,7 +563,7 @@ dashboard ya consultaba: **no añaden ni una consulta**.
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=     # la PUBLISHABLE (sb_publishable_…), ver abajo
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 RESEND_API_KEY=            # opcional: sin ella se omiten los correos
 EMAIL_FROM=                # opcional: por defecto ya usa el dominio verificado
@@ -574,6 +577,27 @@ DEV_ORIGINS=               # opcional: IPs extra para probar desde el celular
 | `NEXT_PUBLIC_SITE_URL` | `https://labs.innovalaboratories.org` | Production + Preview |
 | `EMAIL_FROM` | `Laboratorios UMNG <laboratorios@labs.innovalaboratories.org>` | Production + Preview |
 | `RESEND_API_KEY` | clave `paginadivlab-prod` | **solo Production** |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | la **publishable** `sb_publishable_…`, tipo **Config** | Production (falta Preview) |
+
+### Llaves de Supabase: publishable, no legacy (noviembre 2026)
+
+Supabase retira las llaves *legacy* (`anon`/`service_role`, las que empiezan por
+`eyJ…`) **a comienzos de 2027**. Producción, `.env.local` y el keep-alive ya usan
+la **publishable** (`sb_publishable_…`), verificada en `/reservar`, `/consulta` y
+el login del panel.
+
+- **La variable conserva el nombre `NEXT_PUBLIC_SUPABASE_ANON_KEY`** a propósito:
+  al código solo le importa el valor, y renombrarla obligaba a tocar
+  `lib/supabase/{client,server,middleware}.ts` sin ganar nada.
+- **En Vercel va como tipo *Config*, no *Secret*.** Vercel ya no deja guardar una
+  `NEXT_PUBLIC_*` como Secret ("Remove the public framework prefix…"), y un Secret
+  guardado no se puede convertir: hay que borrar la variable y crearla de nuevo.
+  Es correcto que sea legible: la publishable está hecha para viajar al navegador.
+- **La `sb_secret_…` no se usa en ningún lado** y no debe aparecer en el código,
+  en Vercel ni en `.env.local`. El proyecto no necesita llave de servicio.
+- **Pendiente:** marcar también *Preview* en esa variable (al recrearla quedó solo
+  en Production) y, cuando lleve un par de semanas estable, **desactivar las
+  llaves legacy** en Supabase → Project Settings → API Keys.
 
 `RESEND_API_KEY` se restringe a Production a propósito: si estuviera también en
 Preview, cualquier rama desplegada podría mandar correos reales a estudiantes
@@ -865,14 +889,13 @@ confirma que Excel lo aceptará.
 - **Laboratorios del piloto sin horario**: Física, Química y el Cubo de Práctica
   tienen oferta académica pero **ningún bloque publicado**, así que su calendario
   sale vacío. Se resuelve desde `/panel/horarios`, no por SQL.
-- **Keep-alive sin activar**: falta agregar `SUPABASE_URL` y `SUPABASE_ANON_KEY`
-  como secretos en GitHub Actions y ejecutar el workflow una vez a mano.
 - Faltan los tipos de la BD (`lib/types/database.types.ts` con
   `supabase gen types typescript`); hoy se tipan las consultas a mano con casts.
 - **Rol `estudiante` legado**: los perfiles antiguos siguen en `profiles` y pueden
   iniciar sesión (van a `/reservar`). Decidir si se depuran.
-- **API keys `anon` legacy** (Supabase las deprecia a fin de 2026 a favor de
-  `publishable`/`secret`).
+- **Llaves legacy de Supabase todavía activas** (se retiran a comienzos de 2027).
+  La app ya no las usa; falta desactivarlas tras un par de semanas estable y
+  agregar *Preview* a la variable en Vercel. Ver *Llaves de Supabase*.
 
 ---
 
@@ -895,10 +918,8 @@ migración), pantalla de recuperación de contraseña, y generar los tipos de la
 
 - **No se registra la salida.** Las horas acreditadas son las de la franja, no
   las de la visita real. Medirlo exigiría un segundo escaneo al salir.
-- **El QR se genera fuera.** El panel muestra el enlace con botón de copiar; el
-  código se produce en cualquier generador y se imprime. Dibujarlo en la
-  aplicación exigiría una librería nueva para algo que se hace una vez por
-  laboratorio.
+- ~~El QR se genera fuera~~ **Resuelto:** `lib/qr.ts` lo dibuja como SVG en el
+  servidor y `/panel/qr/<LAB>` arma el cartel listo para imprimir.
 - **Las solicitudes anunciadas y no confirmadas no caducan.** Quien se anuncia
   por QR y no aparece deja una fila `pendiente` ocupando cupo hasta que termine
   la franja. Con el volumen del piloto no molesta; a escala convendría una
